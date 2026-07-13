@@ -1,0 +1,12 @@
+# Ambiente Virtual e Cache Python
+.venv/
+venv/
+ENV/
+__pycache__/
+*.pyc
+
+# Arquivo de Credenciais Sensíveis
+.env
+
+# Configurações de Agentes do Workspace
+.agents/
