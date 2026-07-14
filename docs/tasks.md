@@ -6,7 +6,7 @@ Este arquivo centraliza o gerenciamento de escopo do agente GitOps. Os IDs abaix
 |---|---|
 | Versão | 1.0 |
 | Última atualização | 2026-07-13 |
-| Total de tarefas | 5 |
+| Total de tarefas | 6 |
 
 ---
 
@@ -17,11 +17,11 @@ Este arquivo centraliza o gerenciamento de escopo do agente GitOps. Os IDs abaix
 **Depende de:** Nenhuma
 
 ### Checklist de Entrega:
-- [ ] Criar o arquivo `.gitignore` garantindo o bloqueio estrito do arquivo `.env` antes do primeiro commit.
-- [ ] Criar o arquivo `.env.example` dentro da pasta `/infra` mapeando as variáveis: `GITHUB_TOKEN`, `TELEGRAM_TOKEN`, e `TELEGRAM_CHAT_ID` (sem expor os valores reais).
-- [ ] Configurar o arquivo `requirements.txt` com as dependências do projeto (ex: `langgraph`, `pydantic`, `python-dotenv`, `requests`, `langchain-core`).
-- [ ] Criar a estrutura básica de pastas do projeto: `/src/agent` e `/docs`.
-- [ ] Realizar o commit inicial seguindo o padrão de commits semânticos.
+- [x] Criar o arquivo `.gitignore` garantindo o bloqueio estrito do arquivo `.env` antes do primeiro commit.
+- [x] Criar o arquivo `.env.example` dentro da pasta `/infra` mapeando as variáveis: `GITHUB_TOKEN`, `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID` e `GEMINI_API_KEY` (sem expor os valores reais).
+- [x] Configurar o arquivo `requirements.txt` com as dependências do projeto (ex: `langgraph`, `pydantic`, `python-dotenv`, `requests`, `langchain-core`).
+- [x] Criar a estrutura básica de pastas do projeto: `/src/agent` e `/docs`.
+- [x] Realizar o commit inicial seguindo o padrão de commits semânticos.
 
 ---
 
@@ -37,6 +37,7 @@ Este arquivo centraliza o gerenciamento de escopo do agente GitOps. Os IDs abaix
 - [ ] Implementar o `router_node` configurado para interagir com a LLM e preencher o JSON do Pydantic a partir do comando recebido no terminal.
 - [ ] Implementar o `confirmator_node` que intercepta o fluxo: se a ação extraída for `delete_issue`, o nó deve travar a execução e solicitar uma confirmação manual (`sim`/`não`) via prompt de comando do terminal.
 - [ ] Configurar o roteamento condicional no grafo (`add_conditional_edges`) para seguir para a execução apenas se a flag de validação/confirmação for verdadeira, abortando o fluxo caso contrário.
+- [ ] Criar testes unitários para validar o comportamento dos nós e transições do grafo.
 - [ ] Realizar commits semânticos incrementais durante o desenvolvimento.
 
 ---
@@ -52,6 +53,7 @@ Este arquivo centraliza o gerenciamento de escopo do agente GitOps. Os IDs abaix
 - [ ] Amarrar a ferramenta do GitHub ao nó `executor` dentro do fluxo do LangGraph.
 - [ ] Garantir que a exclusão de uma issue via API só aconteça se a resposta do nó de confirmação no terminal (`T-002`) tiver sido estritamente positiva.
 - [ ] Validar o tratamento de erros básicos (ex: erro 404 de repositório ou token inválido do GitHub) para evitar o travamento do loop do terminal.
+- [ ] Criar testes unitários para validar a integração com a API do GitHub e a lógica do executor.
 - [ ] Commit semântico da funcionalidade.
 
 ---
@@ -67,6 +69,7 @@ Este arquivo centraliza o gerenciamento de escopo do agente GitOps. Os IDs abaix
 - [ ] Implementar a função de notificação usando `requests.post` apontando para os endpoints oficiais do Telegram.
 - [ ] Amarrar a ferramenta criada ao nó `notifier` na saída do grafo do LangGraph.
 - [ ] Testar o recebimento das mensagens Markdown no celular de forma integrada ao fluxo do terminal.
+- [ ] Criar testes unitários para validar a integração e disparo de notificações da API do Telegram.
 - [ ] Commit semântico da funcionalidade.
 
 ---
@@ -82,3 +85,18 @@ Este arquivo centraliza o gerenciamento de escopo do agente GitOps. Os IDs abaix
 - [ ] Desenvolver a apresentação de até 2 slides resumindo o problema, o agente construído, suas ferramentas e a visão geral do fluxo.
 - [ ] Testar a visibilidade pública do repositório do GitHub em uma janela anônima antes da submissão final no AVA.
 - [ ] Commit final de documentação.
+
+---
+
+## T-006: Configuração de Integração Contínua (CI) com GitHub Actions
+**Descrição:** Criação do pipeline automatizado no GitHub Actions para garantir que o código do agente siga as boas práticas do Python e não quebre a execução a cada novo commit.
+**Estimativa:** 2h
+**Depende de:** T-001
+
+### Checklist de Entrega:
+- [ ] Criar a pasta `.github/workflows/` na raiz do repositório.
+- [ ] Criar o arquivo `.github/workflows/ci.yml` configurado para rodar a cada `push` ou `pull_request` na branch principal.
+- [ ] Configurar o workflow para instalar as dependências do `requirements.txt` em um ambiente virtual Python.
+- [ ] Adicionar um passo de validação estática de código (Linter usando `flake8` ou `black`) para garantir a formatação limpa e organizada exigida no Critério 3.
+- [ ] Garantir que o pipeline rode com sucesso e exiba o "check" verde na interface do GitHub.
+- [ ] Realizar o commit semântico utilizando o prefixo correto (`ci: implement github actions workflow for code validation`).
