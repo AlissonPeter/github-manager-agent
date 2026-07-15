@@ -35,6 +35,6 @@ jobs:
     - name: Run linter (flake8)
       run: |
         # Parar o build se houver erros de sintaxe Python ou nomes indefinidos
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 . --exclude=venv --count --select=E9,F63,F7,F82 --show-source --statistics
         # Avisar ou falhar com estilo/PEP8
-        flake8 . --count --max-complexity=10 --max-line-length=127 --statistics
+        flake8 . --exclude=venv --count --max-complexity=10 --max-line-length=127 --statistics
