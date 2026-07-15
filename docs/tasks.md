@@ -93,4 +93,4 @@ Este arquivo centraliza o gerenciamento de escopo do agente GitOps. Os IDs abaix
 - [x] Criar o arquivo `.github/workflows/ci.yml` configurado para rodar a cada `push` ou `pull_request` na branch principal.
 - [x] Configurar o workflow para instalar as dependências do `requirements.txt` em um ambiente virtual Python.
 - [x] Adicionar um passo de validação estática de código (Linter usando `flake8` ou `black`) para garantir a formatação limpa e organizada exigida no Critério 3.
-- [ ] Garantir que o pipeline rode com sucesso e exiba o "check" verde na interface do GitHub.
+- [x] Garantir que o pipeline rode com sucesso e exiba o "check" verde na interface do GitHub.
