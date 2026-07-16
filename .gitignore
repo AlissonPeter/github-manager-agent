@@ -5,8 +5,28 @@ ENV/
 __pycache__/
 *.pyc
 
+# Cache do pytest
+.pytest_cache/
+
 # Arquivo de Credenciais Sensíveis
 .env
 
 # Configurações de Agentes do Workspace
 .agents/
+
+# IDEs e Editores
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Artefatos de Construção
+dist/
+build/
+*.egg-info/
+
+# Ferramentas de Qualidade
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
