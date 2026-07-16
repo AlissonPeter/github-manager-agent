@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import patch
-from src.agent.graph import router_node, confirmator_node, executor_node, GitActionSchema, route_after_router
+from src.agent.graph import router_node, confirmator_node, GitActionSchema, route_after_router
 
 
 @pytest.fixture(autouse=True)
@@ -54,6 +54,6 @@ def test_graph_uses_default_repo():
 def test_conditional_routing_logic():
     state_close = {"last_action": {"action": "close_issue"}}
     state_create = {"last_action": {"action": "create_issue"}}
-    
+
     assert route_after_router(state_close) == "confirmator"
     assert route_after_router(state_create) == "executor"

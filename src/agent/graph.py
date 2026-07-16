@@ -87,7 +87,7 @@ def confirmator_node(state: AgentState) -> Dict[str, Any]:
         resp = input("🚨 Confirma o fechamento desta issue? (s/n): ")
         ok = str(resp).strip().lower() in {"s", "sim", "y", "yes"}
         return {"user_confirmation": ok}
-    
+
     return {"user_confirmation": True}
 
 
@@ -97,7 +97,7 @@ def executor_node(state: AgentState) -> Dict[str, Any]:
     action = last.get("action")
     if action == "close_issue" and not state.get("user_confirmation"):
         raise RuntimeError("fechamento de issue abortado pelo usuário")
-    
+
     updated_action = {**last, "executed": True}
     return {"last_action": updated_action}
 
