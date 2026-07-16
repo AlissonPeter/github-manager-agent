@@ -32,9 +32,9 @@ Este arquivo centraliza o gerenciamento de escopo do agente GitOps. Os IDs abaix
 ### Checklist de Entrega:
 - [ ] Criar o arquivo `agent/graph.py` utilizando a classe `StateGraph` do LangGraph.
 - [ ] Definir o esquema de estado compartilhado (`AgentState`) usando `TypedDict`, incluindo um campo para armazenar a resposta de confirmação (`user_confirmation`).
-- [ ] Criar o modelo de saída estruturada `GitActionSchema` usando `Pydantic` com suporte para ações como: `create_issue`, `edit_issue`, e `delete_issue`.
+- [ ] Criar o modelo de saída estruturada `GitActionSchema` usando `Pydantic` com suporte para ações como: `create_issue`, `edit_issue`, e `close_issue`.
 - [ ] Implementar o `router_node` configurado para interagir com a LLM (carregando a chave `GEMINI_API_KEY` a partir do arquivo `.env`) e preencher o JSON do Pydantic a partir do comando recebido no terminal.
-- [ ] Implementar o `confirmator_node` que intercepta o fluxo: se a ação extraída for `delete_issue`, o nó deve travar a execução e solicitar uma confirmação manual (`sim`/`não`) via prompt de comando do terminal.
+- [ ] Implementar o `confirmator_node` que intercepta o fluxo: se a ação extraída for `close_issue`, o nó deve travar a execução e solicitar uma confirmação manual (`sim`/`não`) via prompt de comando do terminal.
 - [ ] Configurar o roteamento condicional no grafo (`add_conditional_edges`) para seguir para a execução apenas se a flag de validação/confirmação for verdadeira, abortando o fluxo caso contrário.
 - [ ] Criar testes unitários para validar o comportamento dos nós e transições do grafo.
 
