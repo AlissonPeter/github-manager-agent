@@ -246,8 +246,63 @@ def _prompt_edit(action_data: Dict[str, Any]) -> Dict[str, Any]:
     return {**action_data, "title": new_title, "body": new_body}
 
 
+def _handle_edit_issue(last: Dict[str, Any], issue_data: Dict) -> Dict[str, Any]:
+    """Lida com a edição de uma issue existente."""
+    last = {
+        **last,
+        "title": issue_data.get("title", ""),
+        "body": issue_data.get("body", ""),
+    }
+    return _prompt_edit(last)
+
+
+def _handle_close_issue(last: Dict[str, Any], issue_data: Dict) -> Dict[str, Any]:
+    """Lida com o fechamento de uma issue, incluindo marcação de checklists."""
+    issue_number = last.get("issue_number")
+    if issue_data.get("state") == "closed":
+        raise RuntimeError(f"Issue #{issue_number} já está fechada.")
+
+    body = issue_data.get("body", "")
+    if _has_checklists(body):
+        resp = input(
+            "\n📋 Esta issue possui critérios de aceitação."
+            " Deseja marcar como concluídos?"
+            "\n  1-Sim\n  2-Não\n→ "
+        ).strip()
+        if resp == "1":
+            body = _mark_checklists(body)
+            last = {**last, "body": body}
+
+    return last
+
+
+def _fetch_issue_data(last: Dict[str, Any]) -> Dict[str, Any]:
+    """Busca dados da issue no GitHub para edição ou fechamento."""
+    repo = last.get("repo")
+    issue_number = last.get("issue_number")
+    action = last.get("action")
+
+    if action not in ("edit_issue", "close_issue") or not repo or not issue_number:
+        return last
+
+    try:
+        result = get_issue(repo, issue_number)
+        issue_data = result.get("issue", {})
+    except Exception as e:
+        raise RuntimeError(
+            f"Issue #{issue_number} não encontrada no repositório {repo}: {e}"
+        )
+
+    if action == "edit_issue":
+        return _handle_edit_issue(last, issue_data)
+    if action == "close_issue":
+        return _handle_close_issue(last, issue_data)
+
+    return last
+
+
 def confirmator_node(state: AgentState) -> Dict[str, Any]:
-    """Nó de confirmação: exibe preview da issue e oferece opções de confirmação, edição ou cancelamento."""
+    """Nó de confirmação: exibe preview e oferece opções de confirmação."""
     last = state.get("last_action", {})
 
     config = get_config()
@@ -255,50 +310,41 @@ def confirmator_node(state: AgentState) -> Dict[str, Any]:
     if not last.get("repo") and default_repo:
         last = {**last, "repo": default_repo}
 
-    action = last.get("action")
-    repo = last.get("repo")
-    issue_number = last.get("issue_number")
-
-    if action in ("edit_issue", "close_issue") and repo and issue_number:
-        try:
-            result = get_issue(repo, issue_number)
-            issue_data = result.get("issue", {})
-        except Exception as e:
-            raise RuntimeError(f"Issue #{issue_number} não encontrada no repositório {repo}: {e}")
-
-        if action == "edit_issue":
-            last = {**last, "title": issue_data.get("title", ""), "body": issue_data.get("body", "")}
-            last = _prompt_edit(last)
-
-        if action == "close_issue":
-            if issue_data.get("state") == "closed":
-                raise RuntimeError(f"Issue #{issue_number} já está fechada.")
-            body = issue_data.get("body", "")
-            if _has_checklists(body):
-                resp = input("\n📋 Esta issue possui critérios de aceitação. Deseja marcar como concluídos?\n  1-Sim\n  2-Não\n→ ").strip()
-                if resp == "1":
-                    body = _mark_checklists(body)
-                    last = {**last, "body": body}
+    last = _fetch_issue_data(last)
 
     preview = _format_issue_preview(last)
     print(f"\n{'=' * 40}\n{preview}\n{'=' * 40}")
 
-    if action == "close_issue":
-        resp = input("\nConfirma o fechamento desta issue?\n  1-Sim\n  2-Não\n→ ").strip()
+    if last.get("action") == "close_issue":
+        resp = input(
+            "\nConfirma o fechamento desta issue?"
+            "\n  1-Sim\n  2-Não\n→ "
+        ).strip()
         if resp == "1":
             return {"last_action": last, "user_confirmation": True}
-        else:
-            print("❌ Operação cancelada pelo usuário.")
-            return {"user_confirmation": False, "last_action": last}
+        print("❌ Operação cancelada pelo usuário.")
+        return {"user_confirmation": False, "last_action": last}
 
+    return _prompt_create_or_edit(last)
+
+
+def _prompt_create_or_edit(last: Dict[str, Any]) -> Dict[str, Any]:
+    """Loop de confirmação para criação ou edição de issues."""
     while True:
-        resp = input("\nConfirma a operação?\n  1-Confirmar\n  2-Editar\n  3-Cancelar\n→ ").strip()
+        resp = input(
+            "\nConfirma a operação?"
+            "\n  1-Confirmar\n  2-Editar\n  3-Cancelar\n→ "
+        ).strip()
 
         if resp == "1":
             return {"last_action": last, "user_confirmation": True}
         elif resp == "2":
             last = _prompt_edit(last)
-            print(f"\n{'=' * 40}\n{_format_issue_preview(last)}\n{'=' * 40}")
+            print(
+                f"\n{'=' * 40}"
+                f"\n{_format_issue_preview(last)}"
+                f"\n{'=' * 40}"
+            )
         elif resp == "3":
             print("❌ Operação cancelada pelo usuário.")
             return {"user_confirmation": False, "last_action": last}
