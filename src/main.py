@@ -18,9 +18,9 @@ def run_terminal_loop(default_repo: Optional[str] = None):
     print("🤖 GitHub Manager Agent - Terminal Interativo")
     print("=" * 60)
     print("Comandos disponíveis:")
-    print("  - 'criar issue <título>' - Cria uma nova issue")
-    print("  - 'editar issue <número> <título>' - Edita uma issue existente")
-    print("  - 'fechar issue <número>' - Fecha uma issue")
+    print("  - 'criar' - Cria uma nova issue (será solicitado título e descrição)")
+    print("  - 'editar <número>' - Edita uma issue existente")
+    print("  - 'fechar <número>' - Fecha uma issue")
     print("  - 'sair' - Encerra o programa")
     print("=" * 60)
     print()
@@ -33,7 +33,7 @@ def run_terminal_loop(default_repo: Optional[str] = None):
                 continue
 
             if command.lower() in {"sair", "exit", "quit"}:
-                print("👋 Até logo!")
+                print("Encerrando...")
                 break
 
             initial_state: AgentState = {
@@ -55,10 +55,10 @@ def run_terminal_loop(default_repo: Optional[str] = None):
             print()
 
         except KeyboardInterrupt:
-            print("\n👋 Até logo!")
+            print("\nEncerrando...")
             break
         except EOFError:
-            print("\n👋 Até logo!")
+            print("\nEncerrando...")
             break
         except Exception as e:
             print(f"❌ Erro: {e}")

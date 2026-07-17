@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import patch, MagicMock
 from src.agent.github_tool import (
+    get_issue,
     create_issue,
     edit_issue,
     close_issue,
@@ -135,3 +136,32 @@ def test_execute_github_action_missing_title():
 
     with pytest.raises(RuntimeError, match="Título da issue obrigatório"):
         execute_github_action(action_data)
+
+
+def test_get_issue_success():
+    """Testa busca bem-sucedida de uma issue."""
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "number": 1,
+        "title": "Test Issue",
+        "body": "Corpo da issue",
+        "state": "open",
+    }
+
+    with patch("src.agent.github_tool.requests.get", return_value=mock_response):
+        result = get_issue("owner/repo", 1)
+        assert result["success"] is True
+        assert result["issue"]["title"] == "Test Issue"
+        assert result["issue"]["body"] == "Corpo da issue"
+
+
+def test_get_issue_not_found():
+    """Testa erro 404 ao buscar issue inexistente."""
+    mock_response = MagicMock()
+    mock_response.status_code = 404
+    mock_response.text = "Not Found"
+
+    with patch("src.agent.github_tool.requests.get", return_value=mock_response):
+        with pytest.raises(RuntimeError, match="Issue #999 ou repositório não encontrado"):
+            get_issue("owner/repo", 999)

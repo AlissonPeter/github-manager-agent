@@ -41,6 +41,21 @@ def create_issue(repo: str, title: str, body: Optional[str] = None) -> Dict[str,
         raise RuntimeError(f"Erro ao criar issue: {response.status_code} - {response.text}")
 
 
+def get_issue(repo: str, issue_number: int) -> Dict[str, Any]:
+    """Busca os dados de uma issue existente no GitHub."""
+    url = f"{GITHUB_API_BASE}/repos/{repo}/issues/{issue_number}"
+    response = requests.get(url, headers=get_headers())
+
+    if response.status_code == 200:
+        return {"success": True, "issue": response.json()}
+    elif response.status_code == 404:
+        raise RuntimeError(f"Issue #{issue_number} ou repositório não encontrado.")
+    elif response.status_code == 401:
+        raise RuntimeError("Token inválido ou sem permissão.")
+    else:
+        raise RuntimeError(f"Erro ao buscar issue: {response.status_code} - {response.text}")
+
+
 def edit_issue(repo: str, issue_number: int, title: Optional[str] = None, body: Optional[str] = None) -> Dict[str, Any]:
     """Edita uma issue existente no GitHub."""
     url = f"{GITHUB_API_BASE}/repos/{repo}/issues/{issue_number}"
@@ -113,6 +128,7 @@ def execute_github_action(action_data: Dict[str, Any]) -> Dict[str, Any]:
 
 
 __all__ = [
+    "get_issue",
     "create_issue",
     "edit_issue",
     "close_issue",
