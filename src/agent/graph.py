@@ -25,6 +25,24 @@ class AgentState(TypedDict):
     current_command: str
     last_action: Dict[str, Any]
     user_confirmation: bool
+    default_repo: Optional[str]
+
+
+def _validate_repo(repo: str) -> bool:
+    """Valida o formato do repositório (owner/repo)."""
+    if not repo:
+        return False
+    parts = repo.split("/")
+    return len(parts) == 2 and all(part.strip() for part in parts)
+
+
+def _prompt_repo() -> str:
+    """Solicita ao usuário o repositório e valida o formato."""
+    while True:
+        repo = input("📦 Informe o repositório (owner/repo): ").strip()
+        if _validate_repo(repo):
+            return repo
+        print("❌ Formato inválido. Use: owner/repo")
 
 
 def _has_checklists(body: str) -> bool:
@@ -304,9 +322,8 @@ def _fetch_issue_data(last: Dict[str, Any]) -> Dict[str, Any]:
 def confirmator_node(state: AgentState) -> Dict[str, Any]:
     """Nó de confirmação: exibe preview e oferece opções de confirmação."""
     last = state.get("last_action", {})
+    default_repo = state.get("default_repo")
 
-    config = get_config()
-    default_repo = config.get("configurable", {}).get("default_repo")
     if not last.get("repo") and default_repo:
         last = {**last, "repo": default_repo}
 
@@ -355,12 +372,10 @@ def _prompt_create_or_edit(last: Dict[str, Any]) -> Dict[str, Any]:
 def executor_node(state: AgentState) -> Dict[str, Any]:
     """Nó executor: executa a ação do GitHub via API REST."""
     last = state.get("last_action", {})
+    default_repo = state.get("default_repo")
 
     if not state.get("user_confirmation"):
         raise RuntimeError("operação abortada pelo usuário")
-
-    config = get_config()
-    default_repo = config.get("configurable", {}).get("default_repo")
 
     if not last.get("repo") and default_repo:
         last = {**last, "repo": default_repo}
@@ -391,8 +406,8 @@ def route_after_enhancer(state: AgentState) -> str:
     return "confirmator"
 
 
-def build_graph(default_repo: Optional[str] = None) -> Any:
-    """Constrói e compila o grafo do LangGraph sem nenhuma dependência do LangChain."""
+def build_graph() -> Any:
+    """Constrói e compila o grafo do LangGraph."""
     g = LGStateGraph(AgentState)
 
     g.add_node("router", router_node)
@@ -426,9 +441,6 @@ def build_graph(default_repo: Optional[str] = None) -> Any:
     memory = MemorySaver()
     app = g.compile(checkpointer=memory)
 
-    if default_repo:
-        setattr(app, "default_repo", default_repo)
-
     return app
 
 
@@ -445,4 +457,6 @@ __all__ = [
     "_prompt_edit",
     "_has_checklists",
     "_mark_checklists",
+    "_validate_repo",
+    "_prompt_repo",
 ]

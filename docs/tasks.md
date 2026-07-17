@@ -44,8 +44,8 @@ Implementação do motor principal do agente utilizando o framework LangGraph, c
 
 ## T-003: Loop do Terminal e Integração com a API do GitHub
 ## Descrição
-Implementação do loop contínuo de leitura no terminal para o usuário interagir com o agente e da ferramenta real de integração com a API REST do GitHub para criação, edição e exclusão de issues, utilizando o `GITHUB_TOKEN` e o `GITHUB_REPO` definidos no arquivo `.env.example`.
-- **Repositório padrão via .env:** Adicionar a variável `GITHUB_REPO` para definir o repositório padrão, evitando necessidade de informar em cada comando.
+Implementação do loop contínuo de leitura no terminal para o usuário interagir com o agente e da ferramenta real de integração com a API REST do GitHub para criação, edição e exclusão de issues, utilizando o GITHUB_TOKEN e o GITHUB_REPO definidos no arquivo `.env.example`.
+- **Repositório padrão via .env:** Adicionar a variável GITHUB_REPO para definir o repositório padrão, evitando necessidade de informar em cada comando.
 - **Descrição inteligente de issues:** Implementado nó `enhancer_node` que utiliza o Ollama para melhorar a descrição fornecida pelo usuário e gerar automaticamente uma seção de checklist em Markdown.
 
 **Estimativa:** 3h
@@ -58,7 +58,7 @@ Implementação do loop contínuo de leitura no terminal para o usuário interag
 - [x] Garantir que a exclusão de uma issue via API só aconteça se a resposta do nó de confirmação no terminal (`T-002`) tiver sido estritamente positiva.
 - [x] Validar o tratamento de erros básicos (ex: erro 404 de repositório ou token inválido do GitHub) para evitar o travamento do loop do terminal.
 - [x] Criar testes unitários para validar a integração com a API do GitHub e a lógica do executor.
-- [x] Configurar `GITHUB_REPO` no `.env` como repositório padrão e implementar fallback automático no `executor_node`.
+- [x] Configurar GITHUB_REPO no .env como repositório padrão e implementar fallback automático no executor_node.
 - [x] Implementar `enhancer_node` que melhora descrições e cria checklists via Ollama antes da criação da issue.
 
 ---
@@ -128,53 +128,56 @@ Remover `BACKEND_HOST_PORT` (não utilizada).
 ---
 
 ## T-008: Confirmação ou edição do título e descrição das issues novas ou já existentes
-**Descrição:** Implementar fluxo interativo com validação de comandos, preview formatado da issue, edição de título e descrição, e confirmação antes de executar ações (criar, editar, fechar). Validação de IDs inválidos com mensagem de erro.
+## Descrição 
+Implementar fluxo interativo com validação de comandos, preview formatado da issue, edição de título e descrição, e confirmação antes de executar ações (criar, editar, fechar). Validação de IDs inválidos com mensagem de erro.
 **Labels:** `backend`
 **Estimativa:** 2h
 **Depende de:** T-002, T-003
 
 ### Critérios de Aceitação:
-- [ ] Validar comandos: aceitar apenas `criar`, `editar <número>` ou `fechar <número>`; exibir erro para comandos inválidos.
-- [ ] Ao criar issue: solicitar título e descrição interativamente via prompt.
-- [ ] Ao editar issue: buscar dados atuais no GitHub e exibir preview formatado antes de permitir edição.
-- [ ] Ao fechar issue: validar se o ID existe no GitHub antes de solicitar confirmação.
-- [ ] Exibir preview da issue (📌 Título, 📄 Descrição, 📦 Repositório) antes da confirmação.
-- [ ] Oferecer opções de confirmação: `1-Confirmar`, `2-Editar`, `3-Cancelar`.
-- [ ] Permitir edição de título e/ou descrição antes de confirmar.
-- [ ] Exibir descrição completa (sem truncamento).
-- [ ] Abortar operação de forma limpa caso o usuário selecione cancelar.
-- [ ] Criar testes unitários para validação de comandos, confirmação, edição e cancelamento.
+- [x] Validar comandos: aceitar apenas `criar`, `editar <número>` ou `fechar <número>`; exibir erro para comandos inválidos.
+- [x] Ao criar issue: solicitar título e descrição interativamente via prompt.
+- [x] Ao editar issue: buscar dados atuais no GitHub e exibir preview formatado antes de permitir edição.
+- [x] Ao fechar issue: validar se o ID existe no GitHub antes de solicitar confirmação.
+- [x] Exibir preview da issue (📌 Título, 📄 Descrição, 📦 Repositório) antes da confirmação.
+- [x] Oferecer opções de confirmação: `1-Confirmar`, `2-Editar`, `3-Cancelar`.
+- [x] Permitir edição de título e/ou descrição antes de confirmar.
+- [x] Exibir descrição completa (sem truncamento).
+- [x] Abortar operação de forma limpa caso o usuário selecione cancelar.
+- [x] Criar testes unitários para validação de comandos, confirmação, edição e cancelamento.
 
 ---
 
 ## T-009: Marcação de checklists ao fechar uma issue
-**Descrição:** Permitir que, ao fechar uma issue, o usuário possa optar por marcar automaticamente todos os itens de checklist (`- [ ]`) como concluídos (`- [x]`) na descrição antes de confirmar o fechamento.
+## Descrição 
+Permitir que, ao fechar uma issue, o usuário possa optar por marcar automaticamente todos os itens de checklist (`- [ ]`) como concluídos (`- [x]`) na descrição antes de confirmar o fechamento.
 **Labels:** `backend`
 **Estimativa:** 1h
 **Depende de:** T-002, T-003
 
 ### Critérios de Aceitação:
-- [ ] Detectar a presença de itens de checklist (`- [ ]`) na descrição da issue ao solicitar fechamento.
-- [ ] Exibir prompt ao usuário perguntando se deseja marcar as checklists como concluídas antes de fechar (`1-Sim`, `2-Não`).
-- [ ] Implementar função que substitui `- [ ]` por `- [x]` em todos os itens da descrição quando o usuário confirmar.
-- [ ] Garantir que a edição da descrição via API do GitHub seja feita antes da ação de fechamento.
-- [ ] Integrar o fluxo no nó `executor` do grafo para a ação `close_issue`.
-- [ ] Mudar a confirmação do fechamento de issues de `s/n` para `1-Sim`, `2-Não` para manter consistência com os demais prompts do agente.
-- [ ] Criar testes unitários para validar os cenários com e sem checklists.
+- [x] Detectar a presença de itens de checklist (`- [ ]`) na descrição da issue ao solicitar fechamento.
+- [x] Exibir prompt ao usuário perguntando se deseja marcar as checklists como concluídas antes de fechar (`1-Sim`, `2-Não`).
+- [x] Implementar função que substitui `- [ ]` por `- [x]` em todos os itens da descrição quando o usuário confirmar.
+- [x] Garantir que a edição da descrição via API do GitHub seja feita antes da ação de fechamento.
+- [x] Integrar o fluxo no nó `executor` do grafo para a ação `close_issue`.
+- [x] Mudar a confirmação do fechamento de issues de `s/n` para `1-Sim`, `2-Não` para manter consistência com os demais prompts do agente.
+- [x] Criar testes unitários para validar os cenários com e sem checklists.
 
 ---
 
 ## T-010: Solicitação interativa do repositório ao iniciar o agente
 ## Descrição
-Ao iniciar o agente, solicitar ao usuário que informe o repositório alvo (formato `owner/repo`) e armazenar em memória, removendo a dependência da variável `GITHUB_REPO` do arquivo `.env`.
+Ao iniciar o agente, solicitar ao usuário que informe o repositório alvo (formato `owner/repo`) e armazenar em memória, removendo a dependência da variável `GITHUB_REPO` do arquivo `.env.example`.
 **Labels:** `backend`
 **Estimativa:** 1h
 **Depende de:** T-002, T-003
+**Status:** Concluído
 
 ## Critérios de Aceitação
-- [ ] Adicionar prompt de entrada ao iniciar o agente solicitando o repositório no formato `owner/repo`.
-- [ ] Validar o formato informado (deve conter exatamente um `/` com `owner` e `repo` preenchidos).
-- [ ] Armazenar o repositório informado em memória utilizando `MemorySaver` do LangGraph para persistência entre chamadas do grafo.
-- [ ] Remover a variável `GITHUB_REPO` do `.env`, `.env.example` e de todo o código que a utiliza.
-- [ ] Atualizar o `executor` para utilizar o repositório armazenado em memória.
-- [ ] Criar testes unitários para validar a entrada, validação e armazenamento do repositório.
+- [x] Adicionar prompt de entrada ao iniciar o agente solicitando o repositório no formato `owner/repo`.
+- [x] Validar o formato informado (deve conter exatamente um `/` com `owner` e `repo` preenchidos).
+- [x] Armazenar o repositório informado em memória utilizando `MemorySaver` do LangGraph para persistência entre chamadas do grafo.
+- [x] Remover a variável `GITHUB_REPO` do `.env.example` e de todo o código que a utiliza.
+- [x] Atualizar o `executor` para utilizar o repositório armazenado em memória.
+- [x] Criar testes unitários para validar a entrada, validação e armazenamento do repositório.
