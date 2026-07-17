@@ -7,14 +7,6 @@ from src.agent.graph import (
 )
 
 
-@pytest.fixture(autouse=True)
-def mock_get_config():
-    """Mock da configuração do LangGraph."""
-    with patch("src.agent.graph.get_config") as mock:
-        mock.return_value = {"configurable": {"default_repo": "owner/repo"}}
-        yield mock
-
-
 def test_has_checklists_true():
     body = "## Critérios\n- [ ] Item 1\n- [ ] Item 2"
     assert _has_checklists(body) is True
@@ -62,7 +54,10 @@ def test_confirmator_close_with_checklists_yes(monkeypatch):
     with patch("src.agent.graph.get_issue", return_value={"success": True, "issue": mock_issue}):
         inputs = iter(["1", "1"])
         monkeypatch.setattr("builtins.input", lambda _: next(inputs))
-        state = {"last_action": {"action": "close_issue", "issue_number": 5}}
+        state = {
+            "last_action": {"action": "close_issue", "issue_number": 5, "repo": "owner/repo"},
+            "default_repo": "owner/repo",
+        }
         result = confirmator_node(state)
         assert result.get("user_confirmation") is True
         assert "- [x] Item 1" in result["last_action"]["body"]
@@ -79,7 +74,10 @@ def test_confirmator_close_with_checklists_no(monkeypatch):
     with patch("src.agent.graph.get_issue", return_value={"success": True, "issue": mock_issue}):
         inputs = iter(["2", "1"])
         monkeypatch.setattr("builtins.input", lambda _: next(inputs))
-        state = {"last_action": {"action": "close_issue", "issue_number": 5}}
+        state = {
+            "last_action": {"action": "close_issue", "issue_number": 5, "repo": "owner/repo"},
+            "default_repo": "owner/repo",
+        }
         result = confirmator_node(state)
         assert result.get("user_confirmation") is True
         assert "body" not in result["last_action"] or "- [ ]" in result["last_action"].get("body", "")
@@ -95,7 +93,10 @@ def test_confirmator_close_without_checklists(monkeypatch):
     with patch("src.agent.graph.get_issue", return_value={"success": True, "issue": mock_issue}):
         inputs = iter(["1"])
         monkeypatch.setattr("builtins.input", lambda _: next(inputs))
-        state = {"last_action": {"action": "close_issue", "issue_number": 3}}
+        state = {
+            "last_action": {"action": "close_issue", "issue_number": 3, "repo": "owner/repo"},
+            "default_repo": "owner/repo",
+        }
         result = confirmator_node(state)
         assert result.get("user_confirmation") is True
 
@@ -110,6 +111,9 @@ def test_confirmator_close_cancel_after_checklist(monkeypatch):
     with patch("src.agent.graph.get_issue", return_value={"success": True, "issue": mock_issue}):
         inputs = iter(["1", "3"])
         monkeypatch.setattr("builtins.input", lambda _: next(inputs))
-        state = {"last_action": {"action": "close_issue", "issue_number": 5}}
+        state = {
+            "last_action": {"action": "close_issue", "issue_number": 5, "repo": "owner/repo"},
+            "default_repo": "owner/repo",
+        }
         result = confirmator_node(state)
         assert result.get("user_confirmation") is False
