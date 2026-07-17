@@ -9,7 +9,7 @@ from langgraph.config import get_config
 
 import ollama
 
-from src.agent.github_tool import execute_github_action
+from src.agent.github_tool import execute_github_action, get_issue
 
 try:
     from dotenv import load_dotenv
@@ -37,6 +37,47 @@ class GitActionSchema(BaseModel):
         if v not in allowed:
             raise ValueError(f"ação inválida: {v}")
         return v
+
+
+def _validate_command(command: str, parsed: GitActionSchema) -> GitActionSchema:
+    """Valida o comando do usuário e ajusta os dados extraídos."""
+    text = command.strip().lower()
+    words = text.split()
+
+    action_word = words[0] if words else ""
+
+    is_create = action_word in {"criar", "create", "cria"}
+    is_edit = action_word in {"editar", "edit", "alterar", "altera", "mudar", "muda", "atualizar", "atualiza"}
+    is_close = action_word in {"fechar", "close", "encerrar", "encerr", "fecha"}
+
+    if is_create:
+        allowed_words = {"issue", "uma", "a", "o", "de", "do", "da", "para", "sobre", "no", "na"}
+        extra_words = [w for w in words[1:] if w not in allowed_words and not w.isdigit()]
+        if extra_words:
+            raise ValueError("Comando inválido. Use: criar (será solicitado título e descrição)")
+        return GitActionSchema(action="create_issue")
+
+    if is_edit:
+        number = None
+        for w in words[1:]:
+            if w.isdigit():
+                number = int(w)
+                break
+        if not number:
+            raise ValueError("Comando inválido. Use: editar <número_da_issue>")
+        return GitActionSchema(action="edit_issue", issue_number=number, title=parsed.title, body=parsed.body)
+
+    if is_close:
+        number = None
+        for w in words[1:]:
+            if w.isdigit():
+                number = int(w)
+                break
+        if not number:
+            raise ValueError("Comando inválido. Use: fechar <número_da_issue>")
+        return GitActionSchema(action="close_issue", issue_number=number)
+
+    raise ValueError("Comando não reconhecido. Use: criar, editar <número> ou fechar <número>")
 
 
 def router_node(state: AgentState) -> Dict[str, Any]:
@@ -79,19 +120,11 @@ Schema esperado:
         parsed_data = json.loads(response_text)
         parsed = GitActionSchema(**parsed_data)
 
-    except Exception as e:
-        print(f"[Aviso] Falha na extração com Ollama, utilizando fallback: {e}")
-        text = state["current_command"].lower()
-        if any(w in text for w in ["fech", "close", "encerr"]):
-            parsed = GitActionSchema(action="close_issue")
-        elif any(w in text for w in ["cria", "create", "novo", "nova"]):
-            parsed = GitActionSchema(action="create_issue", title=state["current_command"])
-        elif any(w in text for w in ["edit", "altera", "muda", "atualiza"]):
-            parsed = GitActionSchema(action="edit_issue")
-        else:
-            parsed = GitActionSchema(action="create_issue", title=state["current_command"])
+    except Exception:
+        parsed = GitActionSchema(action="create_issue")
 
-    return {"last_action": parsed.model_dump()}
+    validated = _validate_command(state["current_command"], parsed)
+    return {"last_action": validated.model_dump()}
 
 
 def enhancer_node(state: AgentState) -> Dict[str, Any]:
@@ -102,6 +135,12 @@ def enhancer_node(state: AgentState) -> Dict[str, Any]:
 
     if action != "create_issue":
         return {"last_action": last}
+
+    if not last.get("title"):
+        print("\n--- Criar Nova Issue ---")
+        title = input("📌 Título da issue: ").strip()
+        body = input("📄 Descrição (Enter para pular): ").strip()
+        last = {**last, "title": title, "body": body}
 
     title = last.get("title", "")
     body = last.get("body", "")
@@ -116,7 +155,7 @@ Analise a descrição fornecida pelo usuário e crie uma descrição melhorada e
 Diretrizes:
 1. Mantenha a intenção original do usuário
 2. Adicione contexto e detalhes relevantes
-3. Crie uma seção de checklist com itens de validação
+3. Crie uma seção de critérios de aceitação com itens de validação
 4. Use formatação Markdown
 5. Seja claro e conciso
 
@@ -126,10 +165,10 @@ Exemplo de formato:
 ## Descrição
 [Descrição melhorada do problema ou funcionalidade]
 
-## Checklist
-- [ ] Item de validação 1
-- [ ] Item de validação 2
-- [ ] Item de validação 3"""
+## Critérios de Aceitação
+- [ ] Critério de aceitação 1
+- [ ] Critério de aceitação 2
+- [ ] Critério de aceitação 3"""
 
     try:
         response = ollama.chat(
@@ -150,16 +189,92 @@ Exemplo de formato:
         return {"last_action": last}
 
 
-def confirmator_node(state: AgentState) -> Dict[str, Any]:
-    """Nó puro: solicita confirmação para ações destrutivas ou de encerramento (`close_issue`)."""
-    last = state.get("last_action", {})
-    action = last.get("action")
-    if action == "close_issue":
-        resp = input("🚨 Confirma o fechamento desta issue? (s/n): ")
-        ok = str(resp).strip().lower() in {"s", "sim", "y", "yes"}
-        return {"user_confirmation": ok}
+def _format_issue_preview(action_data: Dict[str, Any]) -> str:
+    """Formata os dados da issue para exibição no terminal."""
+    action = action_data.get("action")
+    lines = []
 
-    return {"user_confirmation": True}
+    if action == "create_issue":
+        lines.append("📝 Criar Nova Issue")
+    elif action == "edit_issue":
+        lines.append(f"✏️  Editar Issue #{action_data.get('issue_number', '?')}")
+    elif action == "close_issue":
+        lines.append(f"🔒 Fechar Issue #{action_data.get('issue_number', '?')}")
+
+    if action_data.get("repo"):
+        lines.append(f"📦 Repositório: {action_data['repo']}")
+
+    if action_data.get("title"):
+        lines.append(f"📌 Título: {action_data['title']}")
+
+    if action_data.get("body"):
+        lines.append(f"📄 Descrição:\n{action_data['body']}")
+
+    return "\n".join(lines)
+
+
+def _prompt_edit(action_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Solicita ao usuário que edite título e/ou descrição da issue."""
+    print(f"\n{'=' * 40}\n{_format_issue_preview(action_data)}\n{'=' * 40}")
+
+    current_title = action_data.get("title", "")
+    current_body = action_data.get("body", "")
+
+    print("\n--- Edição da Issue ---")
+
+    print(f"\nTítulo atual: {current_title}")
+    new_title = input("Novo título (Enter para manter): ").strip()
+    if not new_title:
+        new_title = current_title
+
+    print(f"\nDescrição atual:\n{current_body}")
+    new_body = input("Nova descrição (Enter para manter): ").strip()
+    if not new_body:
+        new_body = current_body
+
+    return {**action_data, "title": new_title, "body": new_body}
+
+
+def confirmator_node(state: AgentState) -> Dict[str, Any]:
+    """Nó de confirmação: exibe preview da issue e oferece opções de confirmação, edição ou cancelamento."""
+    last = state.get("last_action", {})
+
+    config = get_config()
+    default_repo = config.get("configurable", {}).get("default_repo")
+    if not last.get("repo") and default_repo:
+        last = {**last, "repo": default_repo}
+
+    action = last.get("action")
+    repo = last.get("repo")
+    issue_number = last.get("issue_number")
+
+    if action in ("edit_issue", "close_issue") and repo and issue_number:
+        try:
+            result = get_issue(repo, issue_number)
+            issue_data = result.get("issue", {})
+        except Exception as e:
+            raise RuntimeError(f"Issue #{issue_number} não encontrada no repositório {repo}: {e}")
+
+        if action == "edit_issue":
+            last = {**last, "title": issue_data.get("title", ""), "body": issue_data.get("body", "")}
+            last = _prompt_edit(last)
+
+    preview = _format_issue_preview(last)
+    print(f"\n{'=' * 40}\n{preview}\n{'=' * 40}")
+
+    while True:
+        resp = input("\nConfirma a operação?\n  1-Confirmar\n  2-Editar\n  3-Cancelar\n→ ").strip()
+
+        if resp == "1":
+            return {"last_action": last, "user_confirmation": True}
+        elif resp == "2":
+            last = _prompt_edit(last)
+            print(f"\n{'=' * 40}\n{_format_issue_preview(last)}\n{'=' * 40}")
+        elif resp == "3":
+            print("❌ Operação cancelada pelo usuário.")
+            return {"user_confirmation": False, "last_action": last}
+        else:
+            print("Opção inválida. Digite 1, 2 ou 3.")
 
 
 def executor_node(state: AgentState) -> Dict[str, Any]:
@@ -167,8 +282,8 @@ def executor_node(state: AgentState) -> Dict[str, Any]:
     last = state.get("last_action", {})
     action = last.get("action")
 
-    if action == "close_issue" and not state.get("user_confirmation"):
-        raise RuntimeError("fechamento de issue abortado pelo usuário")
+    if not state.get("user_confirmation"):
+        raise RuntimeError("operação abortada pelo usuário")
 
     config = get_config()
     default_repo = config.get("configurable", {}).get("default_repo")
@@ -192,16 +307,14 @@ def executor_node(state: AgentState) -> Dict[str, Any]:
 def route_after_router(state: AgentState) -> str:
     """Decide se o fluxo vai para confirmação, enhancer ou direto para execução."""
     action = state.get("last_action", {}).get("action")
-    if action == "close_issue":
-        return "confirmator"
     if action == "create_issue":
         return "enhancer"
-    return "executor"
+    return "confirmator"
 
 
 def route_after_enhancer(state: AgentState) -> str:
-    """Após melhorar a descrição, vai para execução."""
-    return "executor"
+    """Após melhorar a descrição, vai para confirmação."""
+    return "confirmator"
 
 
 def build_graph(default_repo: Optional[str] = None) -> Any:
@@ -229,7 +342,7 @@ def build_graph(default_repo: Optional[str] = None) -> Any:
         "enhancer",
         route_after_enhancer,
         {
-            "executor": "executor"
+            "confirmator": "confirmator"
         }
     )
 
@@ -254,4 +367,6 @@ __all__ = [
     "executor_node",
     "build_graph",
     "execute_github_action",
+    "_format_issue_preview",
+    "_prompt_edit",
 ]

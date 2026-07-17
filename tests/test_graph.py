@@ -4,15 +4,38 @@ from src.agent.graph import router_node, confirmator_node, GitActionSchema, rout
 
 
 @pytest.fixture(autouse=True)
-def mock_gemini_api():
-    """Garante que nenhum teste fará requisições HTTP reais para a API do Gemini."""
-    with patch("src.agent.graph.get_gemini_client") as mock_client:
-        mock_client.side_effect = RuntimeError("Mocked API Offline")
-        yield mock_client
+def mock_ollama():
+    """Garante que nenhum teste fará chamadas reais ao Ollama."""
+    with patch("src.agent.graph.ollama") as mock:
+        mock.chat.return_value = {
+            "message": {
+                "content": '{"action": "create_issue", "title": "Teste", "body": "Corpo teste"}'
+            }
+        }
+        yield mock
+
+
+@pytest.fixture(autouse=True)
+def mock_get_config():
+    """Mock da configuração do LangGraph."""
+    with patch("src.agent.graph.get_config") as mock:
+        mock.return_value = {"configurable": {"default_repo": "owner/repo"}}
+        yield mock
+
+
+@pytest.fixture(autouse=True)
+def mock_get_issue():
+    """Mock da busca de issue no GitHub."""
+    with patch("src.agent.graph.get_issue") as mock:
+        mock.return_value = {
+            "success": True,
+            "issue": {"number": 1, "title": "Issue Teste", "body": "Corpo da issue", "state": "open"},
+        }
+        yield mock
 
 
 def test_router_parses_create_issue():
-    state = {"current_command": "Cria uma issue para reportar bug no tasks.md"}
+    state = {"current_command": "criar"}
     result = router_node(state)
     assert isinstance(result, dict)
     assert "last_action" in result
@@ -21,18 +44,16 @@ def test_router_parses_create_issue():
 
 
 def test_confirmator_blocks_close_when_no(monkeypatch):
-    # Simula input do usuário respondendo 'não' ao fechamento
-    monkeypatch.setattr("builtins.input", lambda prompt: "não")
-    state = {"last_action": {"action": "close_issue"}}
+    monkeypatch.setattr("builtins.input", lambda prompt: "3")
+    state = {"last_action": {"action": "close_issue", "issue_number": 1}}
     result = confirmator_node(state)
     assert isinstance(result, dict)
     assert result.get("user_confirmation") is False
 
 
 def test_graph_flow_confirmation(monkeypatch):
-    # Fluxo simplificado: router -> confirmator para fechamento
-    monkeypatch.setattr("builtins.input", lambda prompt: "sim")
-    state = {"current_command": "fecha a issue 123"}
+    monkeypatch.setattr("builtins.input", lambda prompt: "1")
+    state = {"current_command": "fechar 123"}
     r = router_node(state)
     state.update(r)
     c = confirmator_node(state)
@@ -41,7 +62,7 @@ def test_graph_flow_confirmation(monkeypatch):
 
 
 def test_graph_uses_default_repo():
-    state = {"current_command": "cria uma issue de teste"}
+    state = {"current_command": "criar"}
     r = router_node(state)
     last = r.get("last_action", {})
     assert isinstance(last, dict)
@@ -56,4 +77,4 @@ def test_conditional_routing_logic():
     state_create = {"last_action": {"action": "create_issue"}}
 
     assert route_after_router(state_close) == "confirmator"
-    assert route_after_router(state_create) == "executor"
+    assert route_after_router(state_create) == "enhancer"
