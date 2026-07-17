@@ -5,8 +5,8 @@ Este arquivo centraliza o gerenciamento de escopo do agente GitOps. Os IDs abaix
 | Campo | Valor |
 |---|---|
 | Versão | 1.0 |
-| Última atualização | 2026-07-13 |
-| Total de tarefas | 7 |
+| Última atualização | 2026-07-17 |
+| Total de tarefas | 10 |
 
 ---
 
@@ -118,3 +118,52 @@ Remover `BACKEND_HOST_PORT` (não utilizada).
 - [ ] Remover variável `BACKEND_HOST_PORT` do `.env`, `.env.example` e `main.py`.
 - [ ] Atualizar system prompt do `router_node` para formato compatível com Ollama.
 - [ ] Testar extração de ações com o modelo `llama3.2:3b`.
+
+---
+
+## T-008: Confirmação ou edição do título e descrição das issues novas ou já existentes
+**Descrição:** Implementar um fluxo de confirmação interativo que permita ao usuário visualizar o título e a descrição da issue antes de criar ou editar, oferecendo opções para confirmar, editar ou cancelar a operação.
+**Labels:** `backend`
+**Estimativa:** 2h
+**Depende de:** T-002, T-003
+
+### Checklist de Entrega:
+- [ ] Exibir o título e a descrição da issue formatados no terminal antes de qualquer envio à API do GitHub.
+- [ ] Adicionar prompt de confirmação com opções claras: `1-Confirmar`, `2-Editar`, `3-Cancelar`.
+- [ ] Implementar lógica de edição que permita modificar título e/ou descrição antes de confirmar.
+- [ ] Garantir que a operação seja abortada de forma limpa caso o usuário selecione cancelar.
+- [ ] Integrar o fluxo de confirmação nos nós `executor` do grafo para criação e edição de issues.
+- [ ] Criar testes unitários para validar os caminhos de confirmação, edição e cancelamento.
+
+---
+
+## T-009: Marcação de checklists ao fechar uma issue
+**Descrição:** Permitir que, ao fechar uma issue, o usuário possa optar por marcar automaticamente todos os itens de checklist (`- [ ]`) como concluídos (`- [x]`) na descrição antes de confirmar o fechamento.
+**Labels:** `backend`
+**Estimativa:** 1h
+**Depende de:** T-002, T-003
+
+### Checklist de Entrega:
+- [ ] Detectar a presença de itens de checklist (`- [ ]`) na descrição da issue ao solicitar fechamento.
+- [ ] Exibir prompt ao usuário perguntando se deseja marcar as checklists como concluídas antes de fechar (`1-Sim`, `2-Não`).
+- [ ] Implementar função que substitui `- [ ]` por `- [x]` em todos os itens da descrição quando o usuário confirmar.
+- [ ] Garantir que a edição da descrição via API do GitHub seja feita antes da ação de fechamento.
+- [ ] Integrar o fluxo no nó `executor` do grafo para a ação `close_issue`.
+- [ ] Mudar a confirmação do fechamento de issues de `s/n` para `1-Sim`, `2-Não` para manter consistência com os demais prompts do agente.
+- [ ] Criar testes unitários para validar os cenários com e sem checklists.
+
+---
+
+## T-010: Solicitação interativa do repositório ao iniciar o agente
+**Descrição:** Ao iniciar o agente, solicitar ao usuário que informe o repositório alvo (formato `owner/repo`) e armazenar em memória, removendo a dependência da variável `GITHUB_REPO` do arquivo `.env`.
+**Labels:** `backend`
+**Estimativa:** 1h
+**Depende de:** T-002, T-003
+
+### Checklist de Entrega:
+- [ ] Adicionar prompt de entrada ao iniciar o agente solicitando o repositório no formato `owner/repo`.
+- [ ] Validar o formato informado (deve conter exatamente um `/` com `owner` e `repo` preenchidos).
+- [ ] Armazenar o repositório informado em memória utilizando `MemorySaver` do LangGraph para persistência entre chamadas do grafo.
+- [ ] Remover a variável `GITHUB_REPO` do `.env`, `.env.example` e de todo o código que a utiliza.
+- [ ] Atualizar o `executor` para utilizar o repositório armazenado em memória.
+- [ ] Criar testes unitários para validar a entrada, validação e armazenamento do repositório.
