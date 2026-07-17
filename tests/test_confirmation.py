@@ -25,14 +25,6 @@ def mock_ollama():
 
 
 @pytest.fixture(autouse=True)
-def mock_get_config():
-    """Mock da configuração do LangGraph."""
-    with patch("src.agent.graph.get_config") as mock:
-        mock.return_value = {"configurable": {"default_repo": "owner/repo"}}
-        yield mock
-
-
-@pytest.fixture(autouse=True)
 def mock_get_issue():
     """Mock da busca de issue no GitHub."""
     with patch("src.agent.graph.get_issue") as mock:
@@ -53,28 +45,40 @@ def test_router_parses_create_issue():
 
 
 def test_confirmator_confirm():
-    state = {"last_action": {"action": "create_issue", "title": "Teste"}}
+    state = {
+        "last_action": {"action": "create_issue", "title": "Teste"},
+        "default_repo": "owner/repo",
+    }
     with patch("builtins.input", return_value="1"):
         result = confirmator_node(state)
     assert result.get("user_confirmation") is True
 
 
 def test_confirmator_cancel():
-    state = {"last_action": {"action": "create_issue", "title": "Teste"}}
+    state = {
+        "last_action": {"action": "create_issue", "title": "Teste"},
+        "default_repo": "owner/repo",
+    }
     with patch("builtins.input", return_value="3"):
         result = confirmator_node(state)
     assert result.get("user_confirmation") is False
 
 
 def test_confirmator_invalid_then_confirm():
-    state = {"last_action": {"action": "create_issue", "title": "Teste"}}
+    state = {
+        "last_action": {"action": "create_issue", "title": "Teste"},
+        "default_repo": "owner/repo",
+    }
     with patch("builtins.input", side_effect=["x", "1"]):
         result = confirmator_node(state)
     assert result.get("user_confirmation") is True
 
 
 def test_confirmator_edit_then_confirm():
-    state = {"last_action": {"action": "edit_issue", "title": "Título Antigo"}}
+    state = {
+        "last_action": {"action": "edit_issue", "title": "Título Antigo"},
+        "default_repo": "owner/repo",
+    }
     with patch("builtins.input", side_effect=["2", "Título Novo", "", "1"]):
         result = confirmator_node(state)
     assert result.get("user_confirmation") is True
@@ -148,7 +152,10 @@ def test_route_after_enhancer():
 def test_graph_flow_create_issue(monkeypatch):
     inputs = iter(["1"])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
-    state = {"last_action": {"action": "create_issue", "title": "Teste"}}
+    state = {
+        "last_action": {"action": "create_issue", "title": "Teste"},
+        "default_repo": "owner/repo",
+    }
     result = confirmator_node(state)
     assert result.get("user_confirmation") is True
 
@@ -156,6 +163,9 @@ def test_graph_flow_create_issue(monkeypatch):
 def test_graph_flow_close_issue_cancel(monkeypatch):
     inputs = iter(["3"])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
-    state = {"last_action": {"action": "close_issue", "issue_number": 5}}
+    state = {
+        "last_action": {"action": "close_issue", "issue_number": 5},
+        "default_repo": "owner/repo",
+    }
     result = confirmator_node(state)
     assert result.get("user_confirmation") is False

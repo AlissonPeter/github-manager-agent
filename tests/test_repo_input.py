@@ -1,5 +1,4 @@
 """Testes para T-010: Solicitação interativa do repositório."""
-import pytest
 from unittest.mock import patch
 from src.agent.graph import _validate_repo, _prompt_repo, AgentState
 

@@ -16,14 +16,6 @@ def mock_ollama():
 
 
 @pytest.fixture(autouse=True)
-def mock_get_config():
-    """Mock da configuração do LangGraph."""
-    with patch("src.agent.graph.get_config") as mock:
-        mock.return_value = {"configurable": {"default_repo": "owner/repo"}}
-        yield mock
-
-
-@pytest.fixture(autouse=True)
 def mock_get_issue():
     """Mock da busca de issue no GitHub."""
     with patch("src.agent.graph.get_issue") as mock:
@@ -45,7 +37,10 @@ def test_router_parses_create_issue():
 
 def test_confirmator_blocks_close_when_no(monkeypatch):
     monkeypatch.setattr("builtins.input", lambda prompt: "3")
-    state = {"last_action": {"action": "close_issue", "issue_number": 1}}
+    state = {
+        "last_action": {"action": "close_issue", "issue_number": 1},
+        "default_repo": "owner/repo",
+    }
     result = confirmator_node(state)
     assert isinstance(result, dict)
     assert result.get("user_confirmation") is False
@@ -53,7 +48,10 @@ def test_confirmator_blocks_close_when_no(monkeypatch):
 
 def test_graph_flow_confirmation(monkeypatch):
     monkeypatch.setattr("builtins.input", lambda prompt: "1")
-    state = {"current_command": "fechar 123"}
+    state = {
+        "current_command": "fechar 123",
+        "default_repo": "owner/repo",
+    }
     r = router_node(state)
     state.update(r)
     c = confirmator_node(state)

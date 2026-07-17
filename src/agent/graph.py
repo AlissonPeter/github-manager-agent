@@ -5,7 +5,6 @@ from pydantic import BaseModel, Field, field_validator
 
 from langgraph.graph import StateGraph as LGStateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
-from langgraph.config import get_config
 
 import ollama
 
