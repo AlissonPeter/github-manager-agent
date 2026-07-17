@@ -39,11 +39,17 @@ class GitActionSchema(BaseModel):
         return v
 
 
+def _extract_number(words: list) -> int:
+    """Extrai o primeiro número encontrado nas palavras."""
+    for w in words:
+        if w.isdigit():
+            return int(w)
+    return None
+
+
 def _validate_command(command: str, parsed: GitActionSchema) -> GitActionSchema:
     """Valida o comando do usuário e ajusta os dados extraídos."""
-    text = command.strip().lower()
-    words = text.split()
-
+    words = command.strip().lower().split()
     action_word = words[0] if words else ""
 
     is_create = action_word in {"criar", "create", "cria"}
@@ -58,21 +64,13 @@ def _validate_command(command: str, parsed: GitActionSchema) -> GitActionSchema:
         return GitActionSchema(action="create_issue")
 
     if is_edit:
-        number = None
-        for w in words[1:]:
-            if w.isdigit():
-                number = int(w)
-                break
+        number = _extract_number(words[1:])
         if not number:
             raise ValueError("Comando inválido. Use: editar <número_da_issue>")
         return GitActionSchema(action="edit_issue", issue_number=number, title=parsed.title, body=parsed.body)
 
     if is_close:
-        number = None
-        for w in words[1:]:
-            if w.isdigit():
-                number = int(w)
-                break
+        number = _extract_number(words[1:])
         if not number:
             raise ValueError("Comando inválido. Use: fechar <número_da_issue>")
         return GitActionSchema(action="close_issue", issue_number=number)
@@ -280,7 +278,6 @@ def confirmator_node(state: AgentState) -> Dict[str, Any]:
 def executor_node(state: AgentState) -> Dict[str, Any]:
     """Nó executor: executa a ação do GitHub via API REST."""
     last = state.get("last_action", {})
-    action = last.get("action")
 
     if not state.get("user_confirmation"):
         raise RuntimeError("operação abortada pelo usuário")
