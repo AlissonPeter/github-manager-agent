@@ -148,13 +148,12 @@ Remover `BACKEND_HOST_PORT` (não utilizada).
 ---
 
 ## T-009: Marcação de checklists ao fechar uma issue
-## Descrição 
-Permitir que, ao fechar uma issue, o usuário possa optar por marcar automaticamente todos os itens de checklist (`- [ ]`) como concluídos (`- [x]`) na descrição antes de confirmar o fechamento.
+**Descrição:** Permitir que, ao fechar uma issue, o usuário possa optar por marcar automaticamente todos os itens de checklist (`- [ ]`) como concluídos (`- [x]`) na descrição antes de confirmar o fechamento.
 **Labels:** `backend`
 **Estimativa:** 1h
 **Depende de:** T-002, T-003
 
-## Critérios de Aceitação
+### Critérios de Aceitação:
 - [ ] Detectar a presença de itens de checklist (`- [ ]`) na descrição da issue ao solicitar fechamento.
 - [ ] Exibir prompt ao usuário perguntando se deseja marcar as checklists como concluídas antes de fechar (`1-Sim`, `2-Não`).
 - [ ] Implementar função que substitui `- [ ]` por `- [x]` em todos os itens da descrição quando o usuário confirmar.

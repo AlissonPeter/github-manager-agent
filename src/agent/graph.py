@@ -18,10 +18,23 @@ except Exception:
     pass
 
 
+import re
+
+
 class AgentState(TypedDict):
     current_command: str
     last_action: Dict[str, Any]
     user_confirmation: bool
+
+
+def _has_checklists(body: str) -> bool:
+    """Verifica se o corpo da issue contém itens de checklist."""
+    return bool(re.search(r"- \[ \]", body))
+
+
+def _mark_checklists(body: str) -> str:
+    """Marca todos os itens de checklist como concluídos."""
+    return re.sub(r"- \[ \]", "- [x]", body)
 
 
 class GitActionSchema(BaseModel):
@@ -257,8 +270,26 @@ def confirmator_node(state: AgentState) -> Dict[str, Any]:
             last = {**last, "title": issue_data.get("title", ""), "body": issue_data.get("body", "")}
             last = _prompt_edit(last)
 
+        if action == "close_issue":
+            if issue_data.get("state") == "closed":
+                raise RuntimeError(f"Issue #{issue_number} já está fechada.")
+            body = issue_data.get("body", "")
+            if _has_checklists(body):
+                resp = input("\n📋 Esta issue possui critérios de aceitação. Deseja marcar como concluídos?\n  1-Sim\n  2-Não\n→ ").strip()
+                if resp == "1":
+                    body = _mark_checklists(body)
+                    last = {**last, "body": body}
+
     preview = _format_issue_preview(last)
     print(f"\n{'=' * 40}\n{preview}\n{'=' * 40}")
+
+    if action == "close_issue":
+        resp = input("\nConfirma o fechamento desta issue?\n  1-Sim\n  2-Não\n→ ").strip()
+        if resp == "1":
+            return {"last_action": last, "user_confirmation": True}
+        else:
+            print("❌ Operação cancelada pelo usuário.")
+            return {"user_confirmation": False, "last_action": last}
 
     while True:
         resp = input("\nConfirma a operação?\n  1-Confirmar\n  2-Editar\n  3-Cancelar\n→ ").strip()
@@ -366,4 +397,6 @@ __all__ = [
     "execute_github_action",
     "_format_issue_preview",
     "_prompt_edit",
+    "_has_checklists",
+    "_mark_checklists",
 ]
