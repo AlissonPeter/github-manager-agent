@@ -121,6 +121,8 @@ def execute_github_action(action_data: Dict[str, Any]) -> Dict[str, Any]:
     elif action == "close_issue":
         if not issue_number:
             raise RuntimeError("Número da issue obrigatório para fechamento.")
+        if body:
+            edit_issue(repo, issue_number, body=body)
         return close_issue(repo, issue_number)
 
     else:
