@@ -79,7 +79,7 @@ def test_confirmator_edit_then_confirm():
         "last_action": {"action": "edit_issue", "title": "Título Antigo"},
         "default_repo": "owner/repo",
     }
-    with patch("builtins.input", side_effect=["2", "Título Novo", "", "", "1"]):
+    with patch("builtins.input", side_effect=["2", "Título Novo", "", "1"]):
         result = confirmator_node(state)
     assert result.get("user_confirmation") is True
 
@@ -106,7 +106,7 @@ def test_format_issue_preview_close():
 
 def test_prompt_edit_keep_current():
     data = {"title": "Original", "body": "Corpo original"}
-    with patch("builtins.input", side_effect=["", "", ""]):
+    with patch("builtins.input", side_effect=["", ""]):
         result = _prompt_edit(data)
     assert result["title"] == "Original"
     assert result["body"] == "Corpo original"
@@ -114,7 +114,7 @@ def test_prompt_edit_keep_current():
 
 def test_prompt_edit_change_title():
     data = {"title": "Original", "body": "Corpo"}
-    with patch("builtins.input", side_effect=["Novo título", "", ""]):
+    with patch("builtins.input", side_effect=["Novo título", ""]):
         result = _prompt_edit(data)
     assert result["title"] == "Novo título"
     assert result["body"] == "Corpo"
