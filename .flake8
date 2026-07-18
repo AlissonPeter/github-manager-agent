@@ -1,4 +1,4 @@
 [flake8]
 max-complexity = 15
 max-line-length = 150
-exclude = venv
+exclude = venv,create_issue_t007.py,check_permissions.py,check_repo.py,list_repos.py

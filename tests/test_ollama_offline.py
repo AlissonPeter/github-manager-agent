@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import patch
 import ollama
-from src.agent.graph import router_node, enhancer_node, DEFAULT_OLLAMA_MODEL
+from src.agent.graph import router_node, enhancer_node
 
 
 class TestRouterNodeOllamaOffline:
