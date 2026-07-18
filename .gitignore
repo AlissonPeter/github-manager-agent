@@ -11,6 +11,9 @@ __pycache__/
 # Arquivo de Credenciais Sensíveis
 .env
 
+# Workflow do Agente
+WORKFLOW.md
+
 # Configurações de Agentes do Workspace
 .agents/
 .opencode/

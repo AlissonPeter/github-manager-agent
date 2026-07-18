@@ -19,6 +19,10 @@ except Exception:
 
 import re
 
+DEFAULT_OLLAMA_MODEL = os.getenv("OLLAMA_MODEL")
+if not DEFAULT_OLLAMA_MODEL:
+    raise RuntimeError("Variável OLLAMA_MODEL não definida no arquivo .env")
+
 
 class AgentState(TypedDict):
     current_command: str
@@ -137,12 +141,12 @@ def _validate_command(command: str, parsed: GitActionSchema) -> GitActionSchema:
             raise ValueError("Comando inválido. Use: fechar <número_da_issue>")
         return GitActionSchema(action="close_issue", issue_number=number)
 
-    raise ValueError("Comando não reconhecido. Use: criar, editar <número> ou fechar <número>")
+    raise ValueError("Comando não reconhecido. Use: criar, editar <número>, fechar <número> ou histórico")
 
 
 def router_node(state: AgentState) -> Dict[str, Any]:
     """Nó puro: extrai ação estruturada usando Ollama."""
-    model_name = os.getenv("OLLAMA_MODEL", "llama3.2")
+    model_name = os.getenv("OLLAMA_MODEL", DEFAULT_OLLAMA_MODEL)
 
     system_prompt = """Analise o comando do usuário e extraia os dados em formato JSON.
 Retorne APENAS o JSON válido sem nenhum texto adicional.
@@ -180,8 +184,16 @@ Schema esperado:
         parsed_data = json.loads(response_text)
         parsed = GitActionSchema(**parsed_data)
 
-    except Exception:
-        parsed = GitActionSchema(action="create_issue")
+    except ConnectionError as e:
+        raise RuntimeError(
+            f"Falha ao conectar com Ollama: {e}. "
+            "Verifique se o servidor está rodando (ollama serve)."
+        )
+    except Exception as e:
+        raise RuntimeError(
+            f"Erro ao processar comando com Ollama: {e}. "
+            "Verifique se o modelo está disponível."
+        )
 
     validated = _validate_command(state["current_command"], parsed)
     return {"last_action": validated.model_dump()}
@@ -189,7 +201,7 @@ Schema esperado:
 
 def enhancer_node(state: AgentState) -> Dict[str, Any]:
     """Nó que melhora a descrição da issue e cria checklist usando Ollama."""
-    model_name = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
+    model_name = os.getenv("OLLAMA_MODEL", DEFAULT_OLLAMA_MODEL)
     last = state.get("last_action", {})
     action = last.get("action")
 
@@ -207,6 +219,7 @@ def enhancer_node(state: AgentState) -> Dict[str, Any]:
 
     if not body:
         body = f"Criar issue sobre: {title}"
+        last = {**last, "body": body}
 
     system_prompt = """Você é um assistente especializado em criar issues detalhadas para GitHub.
 
@@ -245,7 +258,8 @@ Exemplo de formato:
         return {"last_action": updated_action}
 
     except Exception as e:
-        print(f"[Aviso] Falha ao melhorar descrição, usando descrição original: {e}")
+        print(f"\n⚠️  Ollama indisponível: {e}")
+        print("   Usando descrição original (sem melhoria automática).")
         return {"last_action": last}
 
 
