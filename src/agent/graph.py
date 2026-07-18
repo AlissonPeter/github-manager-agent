@@ -1,4 +1,4 @@
-from typing import TypedDict, Optional, Any, Dict
+from typing import TypedDict, Optional, Any, Dict, List
 import os
 import json
 from pydantic import BaseModel, Field, field_validator
@@ -25,6 +25,8 @@ class AgentState(TypedDict):
     last_action: Dict[str, Any]
     user_confirmation: bool
     default_repo: Optional[str]
+    history: Optional[List[Dict[str, Any]]]
+    issue_titles: Optional[Dict[int, str]]
 
 
 def _validate_repo(repo: str) -> bool:
@@ -33,6 +35,26 @@ def _validate_repo(repo: str) -> bool:
         return False
     parts = repo.split("/")
     return len(parts) == 2 and all(part.strip() for part in parts)
+
+
+def _input_multiline(prompt: str, allow_empty: bool = True) -> str:
+    """Lê entrada de múltiplas linhas do usuário.
+
+    O usuário digita linhas e pressiona Enter.
+    Para finalizar, digita uma linha vazia (Enter sem texto).
+    Se allow_empty for True e o usuário digitar Enter na primeira linha, retorna vazio.
+    """
+    print(prompt)
+    print("  (Digite uma linha vazia para finalizar)")
+    lines = []
+    while True:
+        line = input("  > ").rstrip("\n")
+        if not line and allow_empty and not lines:
+            return ""
+        if not line and lines:
+            break
+        lines.append(line)
+    return "\n".join(lines)
 
 
 def _prompt_repo() -> str:
@@ -69,7 +91,7 @@ class GitActionSchema(BaseModel):
 
     @field_validator("action")
     def validate_action(cls, v: str) -> str:
-        allowed = {"create_issue", "edit_issue", "close_issue"}
+        allowed = {"create_issue", "edit_issue", "close_issue", "historico"}
         if v not in allowed:
             raise ValueError(f"ação inválida: {v}")
         return v
@@ -91,6 +113,10 @@ def _validate_command(command: str, parsed: GitActionSchema) -> GitActionSchema:
     is_create = action_word in {"criar", "create", "cria"}
     is_edit = action_word in {"editar", "edit", "alterar", "altera", "mudar", "muda", "atualizar", "atualiza"}
     is_close = action_word in {"fechar", "close", "encerrar", "encerr", "fecha"}
+    is_historico = action_word in {"histórico", "historico", "history", "hist"}
+
+    if is_historico:
+        return GitActionSchema(action="historico")
 
     if is_create:
         allowed_words = {"issue", "uma", "a", "o", "de", "do", "da", "para", "sobre", "no", "na"}
@@ -173,7 +199,7 @@ def enhancer_node(state: AgentState) -> Dict[str, Any]:
     if not last.get("title"):
         print("\n--- Criar Nova Issue ---")
         title = input("📌 Título da issue: ").strip()
-        body = input("📄 Descrição (Enter para pular): ").strip()
+        body = _input_multiline("📄 Descrição (Enter duas vezes para pular):")
         last = {**last, "title": title, "body": body}
 
     title = last.get("title", "")
@@ -262,7 +288,7 @@ def _prompt_edit(action_data: Dict[str, Any]) -> Dict[str, Any]:
         new_title = current_title
 
     print(f"\nDescrição atual:\n{current_body}")
-    new_body = input("Nova descrição (Enter para manter): ").strip()
+    new_body = _input_multiline("Nova descrição (Enter para manter):", allow_empty=False)
     if not new_body:
         new_body = current_body
 
@@ -279,11 +305,14 @@ def _handle_edit_issue(last: Dict[str, Any], issue_data: Dict) -> Dict[str, Any]
     return _prompt_edit(last)
 
 
-def _handle_close_issue(last: Dict[str, Any], issue_data: Dict) -> Dict[str, Any]:
+def _handle_close_issue(last: Dict[str, Any], issue_data: Dict, issue_titles: Dict[int, str]) -> Dict[str, Any]:
     """Lida com o fechamento de uma issue, incluindo marcação de checklists."""
     issue_number = last.get("issue_number")
     if issue_data.get("state") == "closed":
         raise RuntimeError(f"Issue #{issue_number} já está fechada.")
+
+    title = issue_titles.get(issue_number, issue_data.get("title", "Sem título"))
+    last = {**last, "title": title}
 
     body = issue_data.get("body", "")
     if _has_checklists(body):
@@ -299,7 +328,7 @@ def _handle_close_issue(last: Dict[str, Any], issue_data: Dict) -> Dict[str, Any
     return last
 
 
-def _fetch_issue_data(last: Dict[str, Any]) -> Dict[str, Any]:
+def _fetch_issue_data(last: Dict[str, Any], issue_titles: Dict[int, str] = None) -> Dict[str, Any]:
     """Busca dados da issue no GitHub para edição ou fechamento."""
     repo = last.get("repo")
     issue_number = last.get("issue_number")
@@ -319,7 +348,7 @@ def _fetch_issue_data(last: Dict[str, Any]) -> Dict[str, Any]:
     if action == "edit_issue":
         return _handle_edit_issue(last, issue_data)
     if action == "close_issue":
-        return _handle_close_issue(last, issue_data)
+        return _handle_close_issue(last, issue_data, issue_titles or {})
 
     return last
 
@@ -328,11 +357,12 @@ def confirmator_node(state: AgentState) -> Dict[str, Any]:
     """Nó de confirmação: exibe preview e oferece opções de confirmação."""
     last = state.get("last_action", {})
     default_repo = state.get("default_repo")
+    issue_titles = state.get("issue_titles", {})
 
     if not last.get("repo") and default_repo:
         last = {**last, "repo": default_repo}
 
-    last = _fetch_issue_data(last)
+    last = _fetch_issue_data(last, issue_titles)
 
     preview = _format_issue_preview(last)
     print(f"\n{'=' * 40}\n{preview}\n{'=' * 40}")
@@ -378,6 +408,8 @@ def executor_node(state: AgentState) -> Dict[str, Any]:
     """Nó executor: executa a ação do GitHub via API REST."""
     last = state.get("last_action", {})
     default_repo = state.get("default_repo")
+    history = state.get("history", [])
+    issue_titles = state.get("issue_titles", {})
 
     if not state.get("user_confirmation"):
         raise RuntimeError("operação abortada pelo usuário")
@@ -388,19 +420,82 @@ def executor_node(state: AgentState) -> Dict[str, Any]:
     try:
         result = execute_github_action(last)
         updated_action = {**last, "executed": True, "result": result}
-        return {"last_action": updated_action}
+
+        issue_number = last.get("issue_number")
+        if not issue_number and result.get("issue"):
+            issue_number = result["issue"].get("number")
+
+        title = last.get("title")
+        if issue_number and title:
+            issue_titles = {**issue_titles, issue_number: title}
+
+        history_entry = {
+            "action": last.get("action"),
+            "title": title or "Sem título",
+            "issue_number": issue_number,
+            "repo": last.get("repo"),
+        }
+        return {"last_action": updated_action, "history": history + [history_entry], "issue_titles": issue_titles}
     except RuntimeError as e:
         if default_repo and "Repositório não encontrado" in str(e):
             last = {**last, "repo": default_repo}
             result = execute_github_action(last)
             updated_action = {**last, "executed": True, "result": result}
-            return {"last_action": updated_action}
+
+            issue_number = last.get("issue_number")
+            if not issue_number and result.get("issue"):
+                issue_number = result["issue"].get("number")
+
+            title = last.get("title")
+            if issue_number and title:
+                issue_titles = {**issue_titles, issue_number: title}
+
+            history_entry = {
+                "action": last.get("action"),
+                "title": title or "Sem título",
+                "issue_number": issue_number,
+                "repo": last.get("repo"),
+            }
+            return {"last_action": updated_action, "history": history + [history_entry], "issue_titles": issue_titles}
         raise RuntimeError(f"Falha na execução da ação GitHub: {e}")
 
 
+def historico_node(state: AgentState) -> Dict[str, Any]:
+    """Nó que exibe o histórico de ações realizadas."""
+    history = state.get("history", [])
+
+    if not history:
+        print("\n📋 Nenhuma ação registrada no histórico.")
+        return {}
+
+    action_labels = {
+        "create_issue": "Criada",
+        "edit_issue": "Editada",
+        "close_issue": "Fechada",
+    }
+
+    repo = history[-1].get("repo", "")
+
+    print("\n" + "=" * 50)
+    print(f"📋 Histórico de Issues ({repo})")
+    print("=" * 50)
+
+    for i, entry in enumerate(reversed(history), 1):
+        action = entry.get("action", "unknown")
+        label = action_labels.get(action, action)
+        title = entry.get("title", "Sem título")
+        number = entry.get("issue_number", "?")
+        print(f"  {i}. {label} - #{number} {title}")
+
+    print("=" * 50)
+    return {}
+
+
 def route_after_router(state: AgentState) -> str:
-    """Decide se o fluxo vai para confirmação, enhancer ou direto para execução."""
+    """Decide se o fluxo vai para confirmação, enhancer, historico ou direto para execução."""
     action = state.get("last_action", {}).get("action")
+    if action == "historico":
+        return "historico"
     if action == "create_issue":
         return "enhancer"
     return "confirmator"
@@ -419,6 +514,7 @@ def build_graph() -> Any:
     g.add_node("enhancer", enhancer_node)
     g.add_node("confirmator", confirmator_node)
     g.add_node("executor", executor_node)
+    g.add_node("historico", historico_node)
 
     g.add_edge(START, "router")
 
@@ -428,7 +524,8 @@ def build_graph() -> Any:
         {
             "confirmator": "confirmator",
             "enhancer": "enhancer",
-            "executor": "executor"
+            "executor": "executor",
+            "historico": "historico"
         }
     )
 
@@ -442,6 +539,7 @@ def build_graph() -> Any:
 
     g.add_edge("confirmator", "executor")
     g.add_edge("executor", END)
+    g.add_edge("historico", END)
 
     memory = MemorySaver()
     app = g.compile(checkpointer=memory)
@@ -456,6 +554,7 @@ __all__ = [
     "enhancer_node",
     "confirmator_node",
     "executor_node",
+    "historico_node",
     "build_graph",
     "execute_github_action",
     "_format_issue_preview",
