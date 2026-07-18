@@ -6,7 +6,7 @@ Este arquivo centraliza o gerenciamento de escopo do agente GitOps. Os IDs abaix
 |---|---|
 | Versão | 1.0 |
 | Última atualização | 2026-07-17 |
-| Total de tarefas | 13 |
+| Total de tarefas | 11 |
 
 ---
 
@@ -28,7 +28,6 @@ Inicialização do repositório, isolamento de credenciais sensíveis e montagem
 ## T-002: Modelagem do Estado e Core do Grafo com LangGraph
 ## Descrição 
 Implementação do motor principal do agente utilizando o framework LangGraph, carregando a chave `GEMINI_API_KEY` a partir do arquivo `.env` para a integração com a LLM. O objetivo é desenhar o fluxo de controle, a extração de intenções do usuário em dados estruturados via terminal e os nós de validação lógica.
-**Labels:** `feature`
 **Estimativa:** 4h
 **Depende de:** T-001
 
@@ -48,7 +47,7 @@ Implementação do motor principal do agente utilizando o framework LangGraph, c
 Implementação do loop contínuo de leitura no terminal para o usuário interagir com o agente e da ferramenta real de integração com a API REST do GitHub para criação, edição e exclusão de issues, utilizando o GITHUB_TOKEN e o GITHUB_REPO definidos no arquivo `.env.example`.
 - **Repositório padrão via .env:** Adicionar a variável GITHUB_REPO para definir o repositório padrão, evitando necessidade de informar em cada comando.
 - **Descrição inteligente de issues:** Implementado nó `enhancer_node` que utiliza o Ollama para melhorar a descrição fornecida pelo usuário e gerar automaticamente uma seção de checklist em Markdown.
-**Labels:** `feature`
+
 **Estimativa:** 3h
 **Depende de:** T-001, T-002
 
@@ -67,7 +66,6 @@ Implementação do loop contínuo de leitura no terminal para o usuário interag
 ## T-004: Integração da Ferramenta de Notificação via Telegram
 ## Descrição
 Implementação da ferramenta de notificação ativa (*Push*) utilizando a API de bots do Telegram, disparando alertas formatados em Markdown sempre que uma operação no GitHub for concluída com sucesso pelo grafo, carregando as configurações `TELEGRAM_TOKEN` e `TELEGRAM_CHAT_ID` a partir do arquivo `.env`.
-**Labels:** `feature`
 **Estimativa:** 2h
 **Depende de:** T-001, T-003
 
@@ -83,7 +81,6 @@ Implementação da ferramenta de notificação ativa (*Push*) utilizando a API d
 
 ## T-005: Documentação Final, Engenharia de Prompts e Slides
 ## Descrição Elaboração e consolidação de todos os artefatos textuais, de segurança e de apresentação necessários para a submissão e avaliação final no AVA.
-**Labels:** `feature`
 **Estimativa:** 3h
 **Depende de:** T-001, T-002, T-003, T-004
 
@@ -98,7 +95,6 @@ Implementação da ferramenta de notificação ativa (*Push*) utilizando a API d
 ## T-006: Configuração de Integração Contínua (CI) com GitHub Actions
 ## Descrição 
 Criação do pipeline automatizado no GitHub Actions para garantir que o código do agente siga as boas práticas do Python e não quebre a execução a cada novo commit.
-**Labels:** `infra`
 **Estimativa:** 2h
 **Depende de:** T-001
 
@@ -116,7 +112,7 @@ Criação do pipeline automatizado no GitHub Actions para garantir que o código
 Remover dependência da API do Google Gemini (`google-genai`) em favor do Ollama local (`ollama`), eliminando custos de API e problemas de quota.
 - **Variáveis de ambiente para ser atualizadas:** substituir `GEMINI_API_KEY` por `OLLAMA_MODEL` (padrão: `llama3.2:3b`).
 Remover `BACKEND_HOST_PORT` (não utilizada).
-**Labels:** `feature`
+
 **Estimativa:** 3h
 **Depende de:** T-001, T-002
 
@@ -134,7 +130,7 @@ Remover `BACKEND_HOST_PORT` (não utilizada).
 ## T-008: Confirmação ou edição do título e descrição das issues novas ou já existentes
 ## Descrição 
 Implementar fluxo interativo com validação de comandos, preview formatado da issue, edição de título e descrição, e confirmação antes de executar ações (criar, editar, fechar). Validação de IDs inválidos com mensagem de erro.
-**Labels:** `feature`
+**Labels:** `backend`
 **Estimativa:** 2h
 **Depende de:** T-002, T-003
 
@@ -155,7 +151,7 @@ Implementar fluxo interativo com validação de comandos, preview formatado da i
 ## T-009: Marcação de checklists ao fechar uma issue
 ## Descrição 
 Permitir que, ao fechar uma issue, o usuário possa optar por marcar automaticamente todos os itens de checklist (`- [ ]`) como concluídos (`- [x]`) na descrição antes de confirmar o fechamento.
-**Labels:** `feature`
+**Labels:** `backend`
 **Estimativa:** 1h
 **Depende de:** T-002, T-003
 
@@ -173,7 +169,7 @@ Permitir que, ao fechar uma issue, o usuário possa optar por marcar automaticam
 ## T-010: Solicitação interativa do repositório ao iniciar o agente
 ## Descrição
 Ao iniciar o agente, solicitar ao usuário que informe o repositório alvo (formato `owner/repo`) e armazenar em memória, removendo a dependência da variável `GITHUB_REPO` do arquivo `.env.example`.
-**Labels:** `feature`
+**Labels:** `backend`
 **Estimativa:** 1h
 **Depende de:** T-002, T-003
 **Status:** Concluído
@@ -191,7 +187,7 @@ Ao iniciar o agente, solicitar ao usuário que informe o repositório alvo (form
 ## T-011: Validação de acesso ao repositório no GitHub
 ## Descrição
 Após o usuário informar o repositório no formato `owner/repo`, validar se o token tem acesso de escrita (permissão `push`) ao repositório antes de prosseguir. Caso não tenha acesso, exibir mensagem de erro e solicitar que o usuário informe novamente.
-**Labels:** `feature`
+**Labels:** `backend`
 **Estimativa:** 1h
 **Depende de:** T-010
 **Status:** Concluído
@@ -209,7 +205,7 @@ Após o usuário informar o repositório no formato `owner/repo`, validar se o t
 ## T-012: Comando de histórico de issues
 ## Descrição
 Implementar um comando `histórico` que busca na memória do agente o registro das issues criadas, modificadas e fechadas, exibindo apenas o título, número da issue e a ação realizada (criada, modificada ou fechada).
-**Labels:** `feature`
+**Labels:** `backend`
 **Estimativa:** 1h
 **Depende de:** T-002, T-003
 
@@ -239,42 +235,3 @@ Adicionalmente, o agente agora é **bloqueado** quando Ollama está offline, imp
 - [x] No `router_node`, substituir o `except Exception` silencioso por tratamento específico que logue o erro de conexão com Ollama e informe o usuário.
 - [x] Tornar `OLLAMA_MODEL` obrigatório no `.env` (sem fallback), atualizando `.env.example` com placeholder.
 - [x] Criar testes unitários para validar o comportamento do `router_node` quando o Ollama está indisponível.
-
----
-
-## T-014: Geração autônoma de título e descrição via LLM
-## Descrição
-Atualmente, o agente sempre solicita ao usuário o título e a descrição ao criar ou editar issues. Esta tarefa propõe dar mais autonomia ao agente, permitindo que ele gere título e descrição automaticamente a partir de uma descrição resumida fornecida pelo usuário — semelhante ao que já é feito com a melhoria de descrição e geração de checklists no `enhancer_node`.
-**Labels:** `feature`
-**Estimativa:** 3h
-**Depende de:** T-007, T-013
-
-### Critérios de Aceitação:
-- [ ] Remover a exigência de título obrigatório do usuário ao criar issues — o título deve ser gerado automaticamente pelo LLM a partir da descrição.
-- [ ] Modificar o `enhancer_node` para gerar título automaticamente quando o usuário fornecer apenas uma descrição resumida (ex: "criar issue sobre bug no login").
-- [ ] O LLM deve analisar a descrição e sugerir um título claro e conciso.
-- [ ] O agente deve sugerir labels automaticamente (ex: `bug`, `feature`, `docs`) com base no conteúdo da issue.
-- [ ] Na criação de issues, o agente deve exibir o título e labels sugeridos e permitir que o usuário confirme ou edite antes de prosseguir.
-- [ ] Na edição de issues, o comportamento deve ser semelhante durante criação, onde o agente edita o titulo e a descrição de acordo a nova descrição resumida fornecida pelo usuário.
-- [ ] O fluxo de edição deve permitir que o usuário revise as sugestões do LLM antes de confirmar as alterações.
-- [ ] Manter a opção do usuário fornecer título manualmente caso prefira (fluxo atual deve continuar funcionando).
-- [ ] Criar testes unitários para validar a geração de título, labels e edição autônoma.
-
----
-
-## T-015: Detecção de duplicidade de issues durante criação e edição
-## Descrição
-O agente deve consultar as issues já existentes no repositório do GitHub antes de criar ou editar uma issue, verificando se há duplicidade de título e códigos (como `T-001`, `T-002`, etc.). Isso evita a criação de issues duplicadas e garante a integridade do backlog.
-**Labels:** `backend`
-**Estimativa:** 2h
-**Depende de:** T-007, T-014
-
-### Critérios de Aceitação:
-- [ ] Criar função no `github_tool.py` para buscar issues abertas do repositório via API do GitHub.
-- [ ] Implementar nó `duplicate_checker` no grafo que executa antes do `enhancer_node` na criação de issues.
-- [ ] O nó deve comparar o título sugerido com issues existentes, verificando correspondência exata ou similaridade alta.
-- [ ] O nó deve detectar códigos de task duplicados (ex: `T-001`) no título ou descrição.
-- [ ] Se duplicata for detectada, exibir alerta ao usuário com a issue similar encontrada e permitir prosseguir ou cancelar.
-- [ ] Se não houver duplicata, prosseguir normalmente para o `enhancer_node`.
-- [ ] Na edição, verificar se o novo título não conflita com outras issues abertas.
-- [ ] Criar testes unitários para validar detecção de duplicidade e códigos de task.
