@@ -5,8 +5,8 @@ Este arquivo centraliza o gerenciamento de escopo do agente GitOps. Os IDs abaix
 | Campo | Valor |
 |---|---|
 | Versão | 1.0 |
-| Última atualização | 2026-07-17 |
-| Total de tarefas | 11 |
+| Última atualização | 2026-07-18 |
+| Total de tarefas | 15 |
 
 ---
 
