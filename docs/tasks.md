@@ -235,3 +235,42 @@ Adicionalmente, o agente agora é **bloqueado** quando Ollama está offline, imp
 - [x] No `router_node`, substituir o `except Exception` silencioso por tratamento específico que logue o erro de conexão com Ollama e informe o usuário.
 - [x] Tornar `OLLAMA_MODEL` obrigatório no `.env` (sem fallback), atualizando `.env.example` com placeholder.
 - [x] Criar testes unitários para validar o comportamento do `router_node` quando o Ollama está indisponível.
+
+---
+
+## T-014: Geração autônoma de título e descrição via LLM
+## Descrição
+Atualmente, o agente sempre solicita ao usuário o título e a descrição ao criar ou editar issues. Esta tarefa propõe dar mais autonomia ao agente, permitindo que ele gere título e descrição automaticamente a partir de uma descrição resumida fornecida pelo usuário — semelhante ao que já é feito com a melhoria de descrição e geração de checklists no `enhancer_node`.
+**Labels:** `backend`
+**Estimativa:** 3h
+**Depende de:** T-007, T-013
+
+### Critérios de Aceitação:
+- [ ] Remover a exigência de título obrigatório do usuário ao criar issues — o título deve ser gerado automaticamente pelo LLM a partir da descrição.
+- [ ] Modificar o `enhancer_node` para gerar título automaticamente quando o usuário fornecer apenas uma descrição resumida (ex: "criar issue sobre bug no login").
+- [ ] O LLM deve analisar a descrição e sugerir um título claro e conciso.
+- [ ] O agente deve sugerir labels automaticamente (ex: `bug`, `feature`, `docs`) com base no conteúdo da issue.
+- [ ] Na criação de issues, o agente deve exibir o título e labels sugeridos e permitir que o usuário confirme ou edite antes de prosseguir.
+- [ ] Na edição de issues, o agente deve ser capaz de sugerir melhorias no título, descrição e labels com base no conteúdo atual da issue.
+- [ ] O fluxo de edição deve permitir que o usuário revise as sugestões do LLM antes de confirmar as alterações.
+- [ ] Manter a opção do usuário fornecer título manualmente caso prefira (fluxo atual deve continuar funcionando).
+- [ ] Criar testes unitários para validar a geração de título, labels e edição autônoma.
+
+---
+
+## T-015: Detecção de duplicidade de issues durante criação e edição
+## Descrição
+O agente deve consultar as issues já existentes no repositório do GitHub antes de criar ou editar uma issue, verificando se há duplicidade de título e códigos (como `T-001`, `T-002`, etc.). Isso evita a criação de issues duplicadas e garante a integridade do backlog.
+**Labels:** `backend`
+**Estimativa:** 2h
+**Depende de:** T-007, T-014
+
+### Critérios de Aceitação:
+- [ ] Criar função no `github_tool.py` para buscar issues abertas do repositório via API do GitHub.
+- [ ] Implementar nó `duplicate_checker` no grafo que executa antes do `enhancer_node` na criação de issues.
+- [ ] O nó deve comparar o título sugerido com issues existentes, verificando correspondência exata ou similaridade alta.
+- [ ] O nó deve detectar códigos de task duplicados (ex: `T-001`) no título ou descrição.
+- [ ] Se duplicata for detectada, exibir alerta ao usuário com a issue similar encontrada e permitir prosseguir ou cancelar.
+- [ ] Se não houver duplicata, prosseguir normalmente para o `enhancer_node`.
+- [ ] Na edição, verificar se o novo título não conflita com outras issues abertas.
+- [ ] Criar testes unitários para validar detecção de duplicidade e códigos de task.
