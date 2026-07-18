@@ -42,11 +42,12 @@ def run_terminal_loop():
             result = app.invoke(initial_state, config={"configurable": {"thread_id": "default"}})
 
             last_action = result.get("last_action", {})
+            action = last_action.get("action")
             if last_action.get("executed"):
-                print(f"✅ Ação executada com sucesso: {last_action.get('action')}")
+                print(f"✅ Ação executada com sucesso: {action}")
                 if "result" in last_action:
                     print(f"   Resultado: {last_action['result']}")
-            else:
+            elif action != "historico":
                 print("⚠️  Ação não executada.")
 
             print()
