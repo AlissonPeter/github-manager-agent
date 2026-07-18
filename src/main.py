@@ -23,10 +23,11 @@ def run_terminal_loop():
     print("=" * 60)
 
     if not _check_ollama_connection():
-        print("\n⚠️  Ollama não está acessible. Verifique se o servidor está rodando.")
-        print("   O agente funcionará com funcionalidade limitada (sem melhoria de descrições).")
-        print("   Para iniciar o Ollama: ollama serve")
-        print()
+        print("\n❌ Ollama não está acessível.")
+        print("   O agente requer Ollama para funcionar.")
+        print("   Para iniciar: ollama serve")
+        print("   Abortando...")
+        return
 
     app = build_graph()
 

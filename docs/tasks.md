@@ -224,15 +224,14 @@ Implementar um comando `histórico` que busca na memória do agente o registro d
 Quando o Ollama não está rodando, o `router_node` captura silenciosamente a exceção de conexão no `except Exception` e faz fallback para `action="create_issue"`. Embora comandos reconhecidos (`criar`, `editar`, `fechar`, `histórico`) funcionem normalmente porque o `_validate_command()` os trata por keyword matching, o fallback gera dois problemas reais:
 1. Para comandos não reconhecidos, o usuário vê um preview de "criar issue" antes de receber o erro de comando inválido, o que é confuso.
 2. Não há nenhuma indicação ao usuário de que o Ollama está offline — o erro é engolido silenciosamente.
-Adicionalmente, `OLLAMA_MODEL` foi tornado obrigatório no `.env` (sem fallback), garantindo configuração explícita.
+Adicionalmente, o agente agora é **bloqueado** quando Ollama está offline, impedindo o gerenciamento de issues sem LLM.
+`OLLAMA_MODEL` foi tornado obrigatório no `.env` (sem fallback), garantindo configuração explícita.
 **Labels:** `bug`
 **Estimativa:** 2h
 **Depende de:** T-007
 
 ### Critérios de Aceitação:
-- [x] Adicionar health check do Ollama antes de iniciar o loop principal no `main.py`, exibindo mensagem de erro clara caso o servidor não esteja disponível.
+- [x] Bloquear o agente (encerrar execução) se Ollama não estiver acessível, exibindo mensagem de erro clara.
 - [x] No `router_node`, substituir o `except Exception` silencioso por tratamento específico que logue o erro de conexão com Ollama e informe o usuário.
-- [x] Evitar que comandos não reconhecidos caiam no preview de "criar issue" quando Ollama está offline — o `_validate_command()` já lança `ValueError` nesses casos, então o fluxo deve interromper antes de chegar ao `confirmator_node`.
-- [x] Manter o fallback gracioso no `enhancer_node` (já existente), mas com mensagem de aviso mais clara.
-- [x] Tornar `OLLAMA_MODEL` obrigatório no `.env` (sem fallback), atualizando `.env.example` com placeholder `seu_modelo_ollama_aqui`.
+- [x] Tornar `OLLAMA_MODEL` obrigatório no `.env` (sem fallback), atualizando `.env.example` com placeholder.
 - [x] Criar testes unitários para validar o comportamento do `router_node` quando o Ollama está indisponível.
