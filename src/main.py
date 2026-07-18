@@ -1,13 +1,34 @@
-from src.agent.graph import build_graph, AgentState, _prompt_repo
+import ollama
+
+from src.agent.graph import build_graph, AgentState, _prompt_repo, DEFAULT_OLLAMA_MODEL
+
+
+def _check_ollama_connection() -> bool:
+    """Verifica se o Ollama está acessível. Retorna True se conectado."""
+    try:
+        ollama.chat(
+            model=DEFAULT_OLLAMA_MODEL,
+            messages=[{"role": "user", "content": "ping"}],
+            options={"temperature": 0.1, "num_predict": 1},
+        )
+        return True
+    except Exception:
+        return False
 
 
 def run_terminal_loop():
     """Executa o loop contínuo de interação com o usuário via terminal."""
-    app = build_graph()
-
     print("=" * 60)
     print("🤖 GitHub Manager Agent - Terminal Interativo")
     print("=" * 60)
+
+    if not _check_ollama_connection():
+        print("\n⚠️  Ollama não está acessible. Verifique se o servidor está rodando.")
+        print("   O agente funcionará com funcionalidade limitada (sem melhoria de descrições).")
+        print("   Para iniciar o Ollama: ollama serve")
+        print()
+
+    app = build_graph()
 
     default_repo = _prompt_repo()
     print(f"📦 Repositório selecionado: {default_repo}")
