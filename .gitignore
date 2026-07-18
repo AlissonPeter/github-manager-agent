@@ -13,6 +13,7 @@ __pycache__/
 
 # Configurações de Agentes do Workspace
 .agents/
+.opencode/
 
 # IDEs e Editores
 .idea/

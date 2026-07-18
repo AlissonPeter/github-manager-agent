@@ -181,3 +181,38 @@ Ao iniciar o agente, solicitar ao usuário que informe o repositório alvo (form
 - [x] Remover a variável `GITHUB_REPO` do `.env.example` e de todo o código que a utiliza.
 - [x] Atualizar o `executor` para utilizar o repositório armazenado em memória.
 - [x] Criar testes unitários para validar a entrada, validação e armazenamento do repositório.
+
+---
+
+## T-011: Validação de acesso ao repositório no GitHub
+## Descrição
+Após o usuário informar o repositório no formato `owner/repo`, validar se o token tem acesso de escrita (permissão `push`) ao repositório antes de prosseguir. Caso não tenha acesso, exibir mensagem de erro e solicitar que o usuário informe novamente.
+**Labels:** `backend`
+**Estimativa:** 1h
+**Depende de:** T-010
+**Status:** Concluído
+
+## Critérios de Aceitação
+- [x] Consultar a API do GitHub para verificar se o token tem permissão de escrita (`push`) no repositório.
+- [x] Caso o repositório não exista ou o token não tenha acesso, exibir mensagem de erro clara.
+- [x] Solicitar ao usuário que informe novamente até que um repositório válido e acessível seja fornecido.
+- [x] Utilizar o `GITHUB_TOKEN` para autenticação na consulta (necessário para repositórios privados).
+- [x] Tratar erros de conexão e timeout na requisição à API.
+- [x] Criar testes unitários para validar os cenários de repositório com acesso, sem acesso, não encontrado e erros de conexão.
+
+---
+
+## T-012: Comando de histórico de issues
+## Descrição
+Implementar um comando `histórico` que busca na memória do agente o registro das issues criadas, modificadas e fechadas, exibindo apenas o título, número da issue e a ação realizada (criada, modificada ou fechada).
+**Labels:** `backend`
+**Estimativa:** 1h
+**Depende de:** T-002, T-003
+
+## Critérios de Aceitação
+- [ ] Adicionar comando `histórico` (ou `historico`) à lista de comandos válidos.
+- [ ] Manter um registro em memória de todas as ações realizadas sobre issues (criar, editar, fechar).
+- [ ] Exibir o histórico formatado com: título da issue, número da issue e ação realizada.
+- [ ] Exibir as issues na ordem cronológica (mais recente primeiro).
+- [ ] Caso não haja histórico, exibir mensagem informativa.
+- [ ] Criar testes unitários para validar o registro e exibição do histórico.
