@@ -8,7 +8,7 @@ from langgraph.checkpoint.memory import MemorySaver
 
 import ollama
 
-from src.agent.github_tool import execute_github_action, get_issue
+from src.agent.github_tool import execute_github_action, get_issue, check_repo_access
 
 try:
     from dotenv import load_dotenv
@@ -36,12 +36,18 @@ def _validate_repo(repo: str) -> bool:
 
 
 def _prompt_repo() -> str:
-    """Solicita ao usuário o repositório e valida o formato."""
+    """Solicita ao usuário o repositório e valida o formato e existência."""
     while True:
         repo = input("📦 Informe o repositório (owner/repo): ").strip()
-        if _validate_repo(repo):
-            return repo
-        print("❌ Formato inválido. Use: owner/repo")
+        if not _validate_repo(repo):
+            print("❌ Formato inválido. Use: owner/repo")
+            continue
+        try:
+            if check_repo_access(repo):
+                return repo
+            print(f"❌ Sem acesso ao repositório '{repo}'. Verifique o token ou o nome do repositório.")
+        except RuntimeError as e:
+            print(f"❌ {e}")
 
 
 def _has_checklists(body: str) -> bool:

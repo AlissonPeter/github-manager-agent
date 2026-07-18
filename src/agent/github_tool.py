@@ -10,6 +10,7 @@ except Exception:
 
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 GITHUB_API_BASE = "https://api.github.com"
+REQUEST_TIMEOUT = 30
 
 
 def get_headers() -> Dict[str, str]:
@@ -20,6 +21,24 @@ def get_headers() -> Dict[str, str]:
         "Authorization": f"token {GITHUB_TOKEN}",
         "Accept": "application/vnd.github.v3+json",
     }
+
+
+def check_repo_access(repo: str) -> bool:
+    """Verifica se o token tem acesso ao repositório (permissão de escrita)."""
+    url = f"{GITHUB_API_BASE}/repos/{repo}"
+    try:
+        response = requests.get(url, headers=get_headers(), timeout=REQUEST_TIMEOUT)
+        if response.status_code == 200:
+            data = response.json()
+            permissions = data.get("permissions", {})
+            return permissions.get("push", False)
+        return False
+    except requests.exceptions.ConnectionError:
+        raise RuntimeError("Erro de conexão com a API do GitHub.")
+    except requests.exceptions.Timeout:
+        raise RuntimeError("Timeout ao conectar com a API do GitHub.")
+    except Exception as e:
+        raise RuntimeError(f"Erro ao verificar repositório: {e}")
 
 
 def create_issue(repo: str, title: str, body: Optional[str] = None) -> Dict[str, Any]:
@@ -135,4 +154,5 @@ __all__ = [
     "edit_issue",
     "close_issue",
     "execute_github_action",
+    "check_repo_access",
 ]
