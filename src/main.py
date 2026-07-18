@@ -16,6 +16,7 @@ def run_terminal_loop():
     print("  - 'criar' - Cria uma nova issue (será solicitado título e descrição)")
     print("  - 'editar <número>' - Edita uma issue existente")
     print("  - 'fechar <número>' - Fecha uma issue")
+    print("  - 'histórico' - Exibe o histórico de issues gerenciadas")
     print("  - 'sair' - Encerra o programa")
     print("=" * 60)
     print()
