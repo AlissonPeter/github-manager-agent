@@ -124,6 +124,37 @@ def close_issue(repo: str, issue_number: int) -> Dict[str, Any]:
         raise RuntimeError(f"Erro ao fechar issue: {response.status_code} - {response.text}")
 
 
+def list_open_issues(repo: str) -> list:
+    """Lista todas as issues abertas de um repositório."""
+    url = f"{GITHUB_API_BASE}/repos/{repo}/issues"
+    params = {"state": "open", "per_page": 100}
+
+    try:
+        response = requests.get(url, headers=get_headers(), params=params, timeout=REQUEST_TIMEOUT)
+        if response.status_code == 200:
+            issues = response.json()
+            return [
+                {
+                    "number": issue["number"],
+                    "title": issue["title"],
+                    "body": issue.get("body", ""),
+                    "labels": [label["name"] for label in issue.get("labels", [])],
+                }
+                for issue in issues
+                if not issue.get("pull_request")
+            ]
+        elif response.status_code == 404:
+            raise RuntimeError(f"Repositório não encontrado: {repo}")
+        elif response.status_code == 401:
+            raise RuntimeError("Token inválido ou sem permissão.")
+        else:
+            raise RuntimeError(f"Erro ao listar issues: {response.status_code} - {response.text}")
+    except requests.exceptions.ConnectionError:
+        raise RuntimeError("Erro de conexão com a API do GitHub.")
+    except requests.exceptions.Timeout:
+        raise RuntimeError("Timeout ao conectar com a API do GitHub.")
+
+
 def execute_github_action(action_data: Dict[str, Any]) -> Dict[str, Any]:
     """Executa uma ação do GitHub com base nos dados estruturados."""
     action = action_data.get("action")
@@ -162,6 +193,7 @@ __all__ = [
     "create_issue",
     "edit_issue",
     "close_issue",
+    "list_open_issues",
     "execute_github_action",
     "check_repo_access",
 ]
