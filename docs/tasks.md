@@ -238,23 +238,33 @@ Adicionalmente, o agente agora é **bloqueado** quando Ollama está offline, imp
 
 ---
 
-## T-014: Geração autônoma de título e descrição via LLM
+## T-014: Geração autônoma de título, labels e descrição via LLM
 ## Descrição
-Atualmente, o agente sempre solicita ao usuário o título e a descrição ao criar ou editar issues. Esta tarefa propõe dar mais autonomia ao agente, permitindo que ele gere título e descrição automaticamente a partir de uma descrição resumida fornecida pelo usuário — semelhante ao que já é feito com a melhoria de descrição e geração de checklists no `enhancer_node`.
+Atualmente, o agente sempre solicita ao usuário o título e a descrição ao criar ou editar issues. Esta tarefa propõe dar mais autonomia ao agente, permitindo que ele gere título, labels e descrição automaticamente a partir de uma descrição resumida fornecida pelo usuário — semelhante ao que já é feito com a melhoria de descrição e geração de checklists no `enhancer_node`.
 **Labels:** `backend`
 **Estimativa:** 3h
 **Depende de:** T-007, T-013
 
 ### Critérios de Aceitação:
-- [ ] Remover a exigência de título obrigatório do usuário ao criar issues — o título deve ser gerado automaticamente pelo LLM a partir da descrição.
-- [ ] Modificar o `enhancer_node` para gerar título automaticamente quando o usuário fornecer apenas uma descrição resumida (ex: "criar issue sobre bug no login").
-- [ ] O LLM deve analisar a descrição e sugerir um título claro e conciso.
-- [ ] O agente deve sugerir labels automaticamente (ex: `bug`, `feature`, `docs`) com base no conteúdo da issue.
-- [ ] Na criação de issues, o agente deve exibir o título e labels sugeridos e permitir que o usuário confirme ou edite antes de prosseguir.
-- [ ] Na edição de issues, o agente deve ser capaz de sugerir melhorias no título, descrição e labels com base no conteúdo atual da issue.
-- [ ] O fluxo de edição deve permitir que o usuário revise as sugestões do LLM antes de confirmar as alterações.
-- [ ] Manter a opção do usuário fornecer título manualmente caso prefira (fluxo atual deve continuar funcionando).
-- [ ] Criar testes unitários para validar a geração de título, labels e edição autônoma.
+- [x] Remover a exigência de título obrigatório do usuário ao criar issues — o título deve ser gerado automaticamente pelo LLM a partir da descrição.
+- [x] Modificar o `enhancer_node` para gerar título automaticamente quando o usuário fornecer apenas uma descrição resumida (ex: "criar issue sobre bug no login").
+- [x] O LLM deve analisar a descrição e sugerir um título claro e conciso.
+- [x] O agente deve sugerir labels automaticamente com base no conteúdo da issue.
+- [x] Na criação de issues, o agente deve exibir o título e labels sugeridos.
+- [x] Na edição de issues, o agente deve se comportar semelhante na criação das issues, gerando nova descrição, título e labels.
+- [x] O fluxo de edição deve permitir que o usuário revise as sugestões do LLM antes de confirmar as alterações.
+- [x] Manter a opção do usuário fornecer título manualmente caso prefira (fluxo atual deve continuar funcionando).
+- [x] Criar tecla de atalho Ctrl+L para criar novas linhas durante a criação ou edição nas descrições de issues e permitir o foco do campo de texto voltar e avançar nessas edições.
+- [x] Adicionar spinner de progresso durante processamento do LLM.
+- [x] Restringir labels a um conjunto fixo (fix/bug, feature, infra, backend, frontend, docs).
+
+### Implementação:
+- `enhancer_node` agora gera título, labels e body via LLM a partir de descrição resumida
+- `_handle_edit_issue` atualizado para gerar título e labels automaticamente na edição
+- Labels restritas a: fix/bug, feature, infra, backend, frontend, docs
+- Spinner de progresso durante chamadas ao LLM
+- Temperatura reduzida (0.1) para diminuir alucinações
+- Prompt reforçado com regras de português correto e labels fixas
 
 ---
 

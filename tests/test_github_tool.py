@@ -86,6 +86,7 @@ def test_execute_github_action_create():
         "repo": "owner/repo",
         "title": "Nova Issue",
         "body": "Descrição",
+        "labels": ["bug", "enhancement"],
     }
 
     mock_response = MagicMock()
