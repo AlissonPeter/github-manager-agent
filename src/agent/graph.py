@@ -8,7 +8,7 @@ from langgraph.checkpoint.memory import MemorySaver
 
 import ollama
 
-from src.agent.github_tool import execute_github_action, get_issue, check_repo_access
+from src.agent.github_tool import execute_github_action, get_issue, check_repo_access, list_open_issues
 
 try:
     from dotenv import load_dotenv
@@ -55,9 +55,9 @@ class _Spinner:
             i += 1
 
 
-def _ollama_chat(model: str, messages: list, options: dict = None) -> dict:
+def _ollama_chat(model: str, messages: list, options: dict = None, spinner_message: str = "Processando") -> dict:
     """Chama ollama.chat com spinner de progresso."""
-    with _Spinner("Processando"):
+    with _Spinner(spinner_message):
         return ollama.chat(model=model, messages=messages, options=options or {})
 
 
@@ -245,7 +245,8 @@ Schema esperado:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"Comando: {state['current_command']}"}
             ],
-            options={"temperature": 0.1}
+            options={"temperature": 0.1},
+            spinner_message="Analisando comando"
         )
 
         response_text = response["message"]["content"]
@@ -270,6 +271,43 @@ Schema esperado:
 
     validated = _validate_command(state["current_command"], parsed)
     return {"last_action": validated.model_dump()}
+
+
+def _ensure_checklists(body: str) -> str:
+    """Garante que a descrição tenha checkboxes na seção de critérios de aceitação."""
+    if not body:
+        return body
+
+    has_checklist_section = re.search(
+        r"##\s*(Critérios|Criteria|Checklist|Aceitação| acceptance)", body, re.IGNORECASE
+    )
+    has_checkboxes = re.search(r"- \[ \]", body)
+
+    if has_checklist_section and not has_checkboxes:
+        lines = body.split('\n')
+        new_lines = []
+        in_criteria_section = False
+
+        for line in lines:
+            if re.match(
+                r"##\s*(Critérios|Criteria|Checklist|Aceitação| acceptance)", line, re.IGNORECASE
+            ):
+                in_criteria_section = True
+                new_lines.append(line)
+            elif re.match(r"##\s", line) and in_criteria_section:
+                in_criteria_section = False
+                new_lines.append(line)
+            elif in_criteria_section and line.strip() and not line.startswith('- ['):
+                if line.strip().startswith('- '):
+                    new_lines.append(f"- [ ] {line.strip()[2:]}")
+                else:
+                    new_lines.append(f"- [ ] {line.strip()}")
+            else:
+                new_lines.append(line)
+
+        return '\n'.join(new_lines)
+
+    return body
 
 
 def enhancer_node(state: AgentState) -> Dict[str, Any]:
@@ -297,19 +335,40 @@ def enhancer_node(state: AgentState) -> Dict[str, Any]:
 
 Analise a descrição fornecida pelo usuário e crie uma descrição melhorada e profissional para uma issue.
 
-Diretrizes:
+O campo "body" DEVE obrigatoriamente conter as seguintes seções em Markdown:
+
+1. ## Descrição
+   - Contexto do problema ou necessidade
+   - Comportamento esperado vs comportamento atual (se for bug)
+   - Impacto no usuário ou sistema
+
+2. ## Critérios de Aceitação
+   - Mínimo de 3 critérios
+   - Cada critério DEVE usar o formato checkbox: - [ ] Critério aqui
+   - Inclua critérios funcionais, validações e casos de borda
+
+3. ## Critérios Técnicos (opcional, mas recomendado)
+   - Requisitos técnicos de implementação
+   - Dependências ou impactos
+
+Diretrizes IMPORTANTES:
 1. Mantenha a intenção original do usuário
 2. Adicione contexto e detalhes relevantes
-3. Crie título claro e conciso (máximo 72 caracteres)
+3. Título: máximo 72 caracteres, claro e conciso
 4. Labels: escolha APENAS entre fix/bug, feature, infra, backend, frontend, docs. Máximo 3
-5. Crie uma seção de critérios de aceitação com itens de validação
-6. Use formatação Markdown
-7. Seja claro e conciso
+5. SEJA DETALHADO e ESPECÍFICO nos critérios de aceitação
 
-Retorne APENAS um JSON válido com os campos "title", "labels" e "body".
+Retorne APENAS um JSON válido (sem texto adicional, sem markdown code blocks) com os campos:
+- "title": string
+- "labels": array de strings
+- "body": string com Markdown formatado
 
-Exemplo:
-{"title": "Título da issue", "labels": ["bug"], "body": "## Descrição\\n...\\n\\n## Critérios\\n- [ ] Critério 1"}"""
+Exemplo de formato esperado:
+{
+  "title": "Corrigir validação de email",
+  "labels": ["fix/bug"],
+  "body": "## Descrição\\n\\nO campo de email não valida formatos...\\n\\n## Critérios\\n- [ ] Critério 1"
+}"""
 
     try:
         response = _ollama_chat(
@@ -318,7 +377,8 @@ Exemplo:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"Título: {title}\n\nDescrição original: {body}"}
             ],
-            options={"temperature": 0.3}
+            options={"temperature": 0.3},
+            spinner_message="Gerando a descrição"
         )
 
         response_text = response["message"]["content"].strip()
@@ -338,6 +398,7 @@ Exemplo:
         suggested_title = parsed_data.get("title", "")
         suggested_labels = parsed_data.get("labels", [])
         enhanced_body = parsed_data.get("body", body)
+        enhanced_body = _ensure_checklists(enhanced_body)
 
         final_title = title if title else suggested_title
         updated_action = {**last, "title": final_title, "labels": suggested_labels, "body": enhanced_body}
@@ -347,6 +408,109 @@ Exemplo:
         print(f"\n⚠️  Ollama indisponível: {e}")
         print("   Usando descrição original (sem melhoria automática).")
         return {"last_action": last}
+
+
+def _calculate_similarity(str1: str, str2: str) -> float:
+    """Calcula similaridade entre duas strings (0.0 a 1.0)."""
+    str1 = str1.lower().strip()
+    str2 = str2.lower().strip()
+
+    if not str1 or not str2:
+        return 0.0
+
+    if str1 == str2:
+        return 1.0
+
+    words1 = set(str1.split())
+    words2 = set(str2.split())
+
+    if not words1 or not words2:
+        return 0.0
+
+    intersection = words1 & words2
+    union = words1 | words2
+
+    return len(intersection) / len(union) if union else 0.0
+
+
+def _extract_task_codes(text: str) -> List[str]:
+    """Extrai códigos de task (ex: T-001, T-012, t-55) de um texto."""
+    pattern = r'[Tt]-(\d{1,3})'
+    matches = re.findall(pattern, text)
+    return [f"T-{match}" for match in matches]
+
+
+def duplicate_checker(state: AgentState) -> Dict[str, Any]:
+    """Verifica se há issues duplicadas antes de criar ou editar."""
+    last = state.get("last_action", {})
+    action = last.get("action")
+    repo = last.get("repo")
+    title = last.get("title", "")
+    body = last.get("body", "")
+    issue_number = last.get("issue_number")
+    current_command = state.get("current_command", "")
+
+    if action not in ("create_issue", "edit_issue") or not repo:
+        return {"last_action": last}
+
+    print(f"\n🔍 Verificando duplicatas no repositório {repo}...")
+
+    try:
+        open_issues = list_open_issues(repo)
+        print(f"   Encontradas {len(open_issues)} issues abertas")
+    except Exception as e:
+        print(f"\n⚠️  Não foi possível verificar issues existentes: {e}")
+        print("   Prosseguindo sem verificação de duplicidade.")
+        return {"last_action": last}
+
+    duplicates = []
+
+    for issue in open_issues:
+        if issue_number and issue["number"] == issue_number:
+            continue
+
+        title_similarity = _calculate_similarity(title, issue["title"])
+        if title_similarity >= 0.7:
+            duplicates.append({
+                "number": issue["number"],
+                "title": issue["title"],
+                "reason": f"Título similar ({title_similarity:.0%})",
+            })
+
+    all_text = f"{title} {body} {current_command}"
+    task_codes = _extract_task_codes(all_text)
+    for code in task_codes:
+        for issue in open_issues:
+            if issue_number and issue["number"] == issue_number:
+                continue
+            issue_codes = _extract_task_codes(f"{issue['title']} {issue.get('body', '')}")
+            if code in issue_codes:
+                duplicates.append({
+                    "number": issue["number"],
+                    "title": issue["title"],
+                    "reason": f"Código de task duplicado ({code})",
+                })
+
+    if duplicates:
+        print("\n" + "=" * 50)
+        print("⚠️  ALERTA: ISSUES DUPLICADAS DETECTADAS!")
+        print("=" * 50)
+        for dup in duplicates[:5]:
+            print(f"\n   • #{dup['number']}: {dup['title']}")
+            print(f"     Motivo: {dup['reason']}")
+        print("\n" + "=" * 50)
+
+        resp = input(
+            "\nDeseja prosseguir mesmo assim?"
+            "\n  1-Sim, prosseguir (criará issue duplicada)"
+            "\n  2-Não, cancelar\n→ "
+        ).strip()
+
+        if resp != "1":
+            print("❌ Operação cancelada pelo usuário.")
+            return {"user_confirmation": False, "last_action": last}
+
+    return {"last_action": last}
 
 
 def _format_issue_preview(action_data: Dict[str, Any]) -> str:
@@ -465,7 +629,8 @@ REGRAS:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"Título atual: {current_title}\n\nNova descrição resumida: {new_description}"}
             ],
-            options={"temperature": 0.1, "num_predict": 1024}
+            options={"temperature": 0.1, "num_predict": 1024},
+            spinner_message="Melhorando descrição"
         )
 
         response_text = response["message"]["content"]
@@ -721,11 +886,22 @@ def route_after_enhancer(state: AgentState) -> str:
     return "confirmator"
 
 
+def route_after_confirmator(state: AgentState) -> str:
+    """Após confirmação, vai para duplicate_checker ou executor."""
+    if not state.get("user_confirmation"):
+        return "executor"
+    action = state.get("last_action", {}).get("action")
+    if action in ("create_issue", "edit_issue"):
+        return "duplicate_checker"
+    return "executor"
+
+
 def build_graph() -> Any:
     """Constrói e compila o grafo do LangGraph."""
     g = LGStateGraph(AgentState)
 
     g.add_node("router", router_node)
+    g.add_node("duplicate_checker", duplicate_checker)
     g.add_node("enhancer", enhancer_node)
     g.add_node("confirmator", confirmator_node)
     g.add_node("executor", executor_node)
@@ -752,7 +928,16 @@ def build_graph() -> Any:
         }
     )
 
-    g.add_edge("confirmator", "executor")
+    g.add_conditional_edges(
+        "confirmator",
+        route_after_confirmator,
+        {
+            "duplicate_checker": "duplicate_checker",
+            "executor": "executor"
+        }
+    )
+
+    g.add_edge("duplicate_checker", "executor")
     g.add_edge("executor", END)
     g.add_edge("historico", END)
 
@@ -766,6 +951,7 @@ __all__ = [
     "AgentState",
     "GitActionSchema",
     "router_node",
+    "duplicate_checker",
     "enhancer_node",
     "confirmator_node",
     "executor_node",
@@ -778,4 +964,6 @@ __all__ = [
     "_mark_checklists",
     "_validate_repo",
     "_prompt_repo",
+    "_calculate_similarity",
+    "_extract_task_codes",
 ]

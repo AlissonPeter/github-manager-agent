@@ -276,11 +276,22 @@ O agente deve consultar as issues já existentes no repositório do GitHub antes
 **Depende de:** T-007, T-014
 
 ### Critérios de Aceitação:
-- [ ] Criar função no `github_tool.py` para buscar issues abertas do repositório via API do GitHub.
-- [ ] Implementar nó `duplicate_checker` no grafo que executa antes do `enhancer_node` na criação de issues.
-- [ ] O nó deve comparar o título sugerido com issues existentes, verificando correspondência exata ou similaridade alta.
-- [ ] O nó deve detectar códigos de task duplicados (ex: `T-001`) no título ou descrição.
-- [ ] Se duplicata for detectada, exibir alerta ao usuário com a issue similar encontrada e permitir prosseguir ou cancelar.
-- [ ] Se não houver duplicata, prosseguir normalmente para o `enhancer_node`.
-- [ ] Na edição, verificar se o novo título não conflita com outras issues abertas.
-- [ ] Criar testes unitários para validar detecção de duplicidade e códigos de task.
+- [x] Criar função no `github_tool.py` para buscar issues abertas do repositório via API do GitHub.
+- [x] Implementar nó `duplicate_checker` no grafo que executa antes do `enhancer_node` na criação de issues.
+- [x] O nó deve comparar o título sugerido com issues existentes, verificando correspondência exata ou similaridade alta.
+- [x] O nó deve detectar códigos de task duplicados (ex: `T-001`) no título ou descrição.
+- [x] Se duplicata for detectada, exibir alerta ao usuário com a issue similar encontrada e permitir prosseguir ou cancelar.
+- [x] Se não houver duplicata, prosseguir normalmente para o `enhancer_node`.
+- [x] Na edição, verificar se o novo título não conflita com outras issues abertas.
+- [x] Criar testes unitários para validar detecção de duplicidade e códigos de task.
+
+### Implementação:
+- Função `list_open_issues()` no `github_tool.py` para buscar issues abertas via API do GitHub
+- Nó `duplicate_checker` no grafo que executa antes do `enhancer_node` na criação e edição
+- Função `_calculate_similarity()` para comparar títulos com similaridade de Jaccard
+- Função `_extract_task_codes()` para extrair códigos de task (T-001, T-012) de textos
+- Detecção de duplicatas por similaridade de título (>=70%) e códigos de task
+- Alerta ao usuário com opções de prosseguir ou cancelar quando duplicata encontrada
+- Verificação também na edição de issues
+- Tratamento de erros de API (continua sem bloquear se não conseguir verificar)
+- 22 testes unitários em `tests/test_duplicate_checker.py`
