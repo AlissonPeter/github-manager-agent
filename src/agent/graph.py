@@ -18,10 +18,47 @@ except Exception:
 
 
 import re
+import threading
+import sys
+
 
 DEFAULT_OLLAMA_MODEL = os.getenv("OLLAMA_MODEL")
 if not DEFAULT_OLLAMA_MODEL:
     raise RuntimeError("Variável OLLAMA_MODEL não definida no arquivo .env")
+
+
+class _Spinner:
+    """Spinner simples que roda em thread separada."""
+    def __init__(self, message: str = "Processando"):
+        self.message = message
+        self._stop = threading.Event()
+        self._thread = None
+
+    def __enter__(self):
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+        return self
+
+    def __exit__(self, *args):
+        self._stop.set()
+        self._thread.join()
+        sys.stdout.write("\r" + " " * (len(self.message) + 10) + "\r")
+        sys.stdout.flush()
+
+    def _run(self):
+        chars = "|/-\\"
+        i = 0
+        while not self._stop.is_set():
+            sys.stdout.write(f"\r  {chars[i % len(chars)]} {self.message}...")
+            sys.stdout.flush()
+            self._stop.wait(0.15)
+            i += 1
+
+
+def _ollama_chat(model: str, messages: list, options: dict = None) -> dict:
+    """Chama ollama.chat com spinner de progresso."""
+    with _Spinner("Processando"):
+        return ollama.chat(model=model, messages=messages, options=options or {})
 
 
 class AgentState(TypedDict):
@@ -41,24 +78,58 @@ def _validate_repo(repo: str) -> bool:
     return len(parts) == 2 and all(part.strip() for part in parts)
 
 
-def _input_multiline(prompt: str, allow_empty: bool = True) -> str:
+def _input_multiline(prompt: str, allow_empty: bool = True, default: str = "") -> str:
     """Lê entrada de múltiplas linhas do usuário.
 
-    O usuário digita linhas e pressiona Enter.
-    Para finalizar, digita uma linha vazia (Enter sem texto).
-    Se allow_empty for True e o usuário digitar Enter na primeira linha, retorna vazio.
+    Enter confirma e envia. Shift+Enter (ou Ctrl+J) cria uma nova linha.
     """
+    from prompt_toolkit import PromptSession
+    from prompt_toolkit.lexers import PygmentsLexer
+    from prompt_toolkit.styles import Style
+    from prompt_toolkit.key_binding import KeyBindings
+    from pygments.lexers import MarkdownLexer
+
     print(prompt)
-    print("  (Digite uma linha vazia para finalizar)")
-    lines = []
-    while True:
-        line = input("  > ").rstrip("\n")
-        if not line and allow_empty and not lines:
-            return ""
-        if not line and lines:
-            break
-        lines.append(line)
-    return "\n".join(lines)
+    print("  (Enter para confirmar, Ctrl+L para nova linha)")
+
+    custom_style = Style.from_dict({
+        "prompt": "#ffffff bg:#3c3c3c",
+    })
+
+    kb = KeyBindings()
+
+    # 1. ENTER CONFIRMA: Força o envio imediato do buffer atual
+    @kb.add('enter')
+    def _(event):
+        event.app.exit(result=event.app.current_buffer.text)
+
+    @kb.add('c-l')
+    def _(event):
+        event.current_buffer.insert_text('\n')
+
+    try:
+        session = PromptSession(
+            lexer=PygmentsLexer(MarkdownLexer),
+            style=custom_style,
+            multiline=True,  # Mantemos True para permitir o \n no buffer
+            key_bindings=kb,
+        )
+        result = session.prompt("  > ", default=default)
+        if not result.strip() and not allow_empty:
+            return default
+        return result if result.strip() else default
+    except Exception:
+        # Fallback se o terminal for muito antigo
+        lines = []
+        while True:
+            line = input("  > ").rstrip("\n")
+            if not line and allow_empty and not lines:
+                return ""
+            if not line and lines:
+                break
+            lines.append(line)
+        result = "\n".join(lines)
+        return result if result else default
 
 
 def _prompt_repo() -> str:
@@ -92,6 +163,7 @@ class GitActionSchema(BaseModel):
     issue_number: Optional[int] = Field(None, description="Número da issue no GitHub (obrigatório se edit ou close)")
     title: Optional[str] = Field(None, description="Título da issue (necessário se create ou edit)")
     body: Optional[str] = Field(None, description="Conteúdo ou descrição do corpo da issue (opcional)")
+    labels: Optional[List[str]] = Field(None, description="Labels da issue (opcional)")
 
     @field_validator("action")
     def validate_action(cls, v: str) -> str:
@@ -162,11 +234,12 @@ Schema esperado:
   "repo": "owner/repo" (APENAS se o usuário mencionou explicitamente),
   "issue_number": número (obrigatório para edit/close),
   "title": "título da issue" (obrigatório para create/edit),
+  "labels": ["label1", "label2"] (obrigatório para create/edit),
   "body": "descrição da issue" (APENAS se o usuário forneceu uma descrição)
 }"""
 
     try:
-        response = ollama.chat(
+        response = _ollama_chat(
             model=model_name,
             messages=[
                 {"role": "system", "content": system_prompt},
@@ -210,9 +283,8 @@ def enhancer_node(state: AgentState) -> Dict[str, Any]:
 
     if not last.get("title"):
         print("\n--- Criar Nova Issue ---")
-        title = input("📌 Título da issue: ").strip()
         body = _input_multiline("📄 Descrição (Enter duas vezes para pular):")
-        last = {**last, "title": title, "body": body}
+        last = {**last, "body": body}
 
     title = last.get("title", "")
     body = last.get("body", "")
@@ -228,23 +300,19 @@ Analise a descrição fornecida pelo usuário e crie uma descrição melhorada e
 Diretrizes:
 1. Mantenha a intenção original do usuário
 2. Adicione contexto e detalhes relevantes
-3. Crie uma seção de critérios de aceitação com itens de validação
-4. Use formatação Markdown
-5. Seja claro e conciso
+3. Crie título claro e conciso (máximo 72 caracteres)
+4. Labels: escolha APENAS entre fix/bug, feature, infra, backend, frontend, docs. Máximo 3
+5. Crie uma seção de critérios de aceitação com itens de validação
+6. Use formatação Markdown
+7. Seja claro e conciso
 
-Retorne APENAS o texto da descrição em Markdown, sem nenhum texto adicional ou explicação.
+Retorne APENAS um JSON válido com os campos "title", "labels" e "body".
 
-Exemplo de formato:
-## Descrição
-[Descrição melhorada do problema ou funcionalidade]
-
-## Critérios de Aceitação
-- [ ] Critério de aceitação 1
-- [ ] Critério de aceitação 2
-- [ ] Critério de aceitação 3"""
+Exemplo:
+{"title": "Título da issue", "labels": ["bug"], "body": "## Descrição\\n...\\n\\n## Critérios\\n- [ ] Critério 1"}"""
 
     try:
-        response = ollama.chat(
+        response = _ollama_chat(
             model=model_name,
             messages=[
                 {"role": "system", "content": system_prompt},
@@ -253,8 +321,26 @@ Exemplo de formato:
             options={"temperature": 0.3}
         )
 
-        enhanced_body = response["message"]["content"].strip()
-        updated_action = {**last, "body": enhanced_body}
+        response_text = response["message"]["content"].strip()
+
+        if response_text.startswith("```"):
+            lines = response_text.split("\n")
+            response_text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+
+        json_start = response_text.find("{")
+        json_end = response_text.rfind("}")
+        if json_start != -1 and json_end != -1 and json_start <= json_end:
+            response_text = response_text[json_start:json_end + 1]
+        else:
+            raise ValueError(f"Resposta não contém JSON: {response_text[:200]}")
+
+        parsed_data = json.loads(response_text, strict=False)
+        suggested_title = parsed_data.get("title", "")
+        suggested_labels = parsed_data.get("labels", [])
+        enhanced_body = parsed_data.get("body", body)
+
+        final_title = title if title else suggested_title
+        updated_action = {**last, "title": final_title, "labels": suggested_labels, "body": enhanced_body}
         return {"last_action": updated_action}
 
     except Exception as e:
@@ -281,6 +367,9 @@ def _format_issue_preview(action_data: Dict[str, Any]) -> str:
     if action_data.get("title"):
         lines.append(f"📌 Título: {action_data['title']}")
 
+    if action_data.get("labels"):
+        lines.append(f"🏷️  Labels: {', '.join(action_data['labels'])}")
+
     if action_data.get("body"):
         lines.append(f"📄 Descrição:\n{action_data['body']}")
 
@@ -288,11 +377,12 @@ def _format_issue_preview(action_data: Dict[str, Any]) -> str:
 
 
 def _prompt_edit(action_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Solicita ao usuário que edite título e/ou descrição da issue."""
+    """Solicita ao usuário que edite título, descrição e/ou labels da issue."""
     print(f"\n{'=' * 40}\n{_format_issue_preview(action_data)}\n{'=' * 40}")
 
     current_title = action_data.get("title", "")
     current_body = action_data.get("body", "")
+    current_labels = action_data.get("labels", [])
 
     print("\n--- Edição da Issue ---")
 
@@ -302,21 +392,132 @@ def _prompt_edit(action_data: Dict[str, Any]) -> Dict[str, Any]:
         new_title = current_title
 
     print(f"\nDescrição atual:\n{current_body}")
-    new_body = _input_multiline("Nova descrição (Enter para manter):", allow_empty=False)
+    new_body = _input_multiline("Nova descrição (Enter para manter):", allow_empty=True, default=current_body)
     if not new_body:
         new_body = current_body
 
-    return {**action_data, "title": new_title, "body": new_body}
+    print(f"\nLabels atuais: {', '.join(current_labels) if current_labels else 'nenhuma'}")
+    new_labels_str = input("Novas labels (Enter para manter, ou separadas por vírgula): ").strip()
+    if not new_labels_str:
+        new_labels = current_labels
+    else:
+        new_labels = [label.strip() for label in new_labels_str.split(",") if label.strip()]
+
+    return {**action_data, "title": new_title, "body": new_body, "labels": new_labels}
 
 
 def _handle_edit_issue(last: Dict[str, Any], issue_data: Dict) -> Dict[str, Any]:
-    """Lida com a edição de uma issue existente."""
+    """Lida com a edição de uma issue existente, sugerindo melhorias via LLM."""
+    model_name = os.getenv("OLLAMA_MODEL", DEFAULT_OLLAMA_MODEL)
+    raw_labels = issue_data.get("labels", [])
+    if raw_labels and isinstance(raw_labels[0], dict):
+        label_names = [label["name"] for label in raw_labels if isinstance(label, dict) and "name" in label]
+    else:
+        label_names = raw_labels if raw_labels else []
     last = {
         **last,
         "title": issue_data.get("title", ""),
         "body": issue_data.get("body", ""),
+        "labels": label_names,
     }
-    return _prompt_edit(last)
+
+    current_title = last.get("title", "")
+    current_body = last.get("body", "")
+    current_labels = last.get("labels", [])
+
+    print(f"\n{'=' * 40}")
+    print("\n✏️  Editar Issue")
+    print(f"📌 Título atual: {current_title}")
+    print(f"🏷️  Labels: {', '.join(current_labels) if current_labels else 'nenhuma'}")
+    print(f"\n📄 Descrição atual:\n{current_body}")
+    print(f"{'=' * 40}")
+
+    new_description = _input_multiline("Nova descrição resumida (Enter para manter a atual):", allow_empty=True)
+    if not new_description:
+        return last
+
+    system_prompt = """Analise a nova descrição e retorne APENAS um JSON válido.
+
+Schema:
+{
+  "title": "título claro",
+  "labels": ["label1", "label2"],
+  "body": "## Descrição\\n\\nDescrição detalhada...\\n\\n## Critérios de Aceitação\\n- [ ] Critério 1\\n- [ ] Critério 2"
+}
+
+REGRAS:
+- Título: máximo 72 caracteres, claro e descritivo, em português correto
+- Labels: escolha APENAS entre fix/bug, feature, infra, backend, frontend, docs. Máximo 3
+- Body deve conter:
+  * Descrição detalhada (contexto, motivo, comportamento esperado)
+  * Critérios de aceitação (mínimo 3, máximo 10) - inclua:
+    - Funcionais (o que deve fazer)
+    - Validações (limites, formatos, campos obrigatórios)
+    - UX (mensagens, estados, loading)
+    - Borda (casos limites, erros)
+- Use \\n para quebras de linha no JSON
+- Seja específico e detalhado nos critérios"""
+
+    try:
+        response = _ollama_chat(
+            model=model_name,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"Título atual: {current_title}\n\nNova descrição resumida: {new_description}"}
+            ],
+            options={"temperature": 0.1, "num_predict": 1024}
+        )
+
+        response_text = response["message"]["content"]
+
+        # Remove markdown code blocks if present
+        if response_text.startswith("```"):
+            lines = response_text.split("\n")
+            response_text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+
+        # Try to extract JSON from the response
+        json_start = response_text.find("{")
+        json_end = response_text.rfind("}")
+        if json_start != -1 and json_end != -1 and json_start <= json_end:
+            response_text = response_text[json_start:json_end + 1]
+        else:
+            raise ValueError(f"Resposta do LLM não contém JSON válido: {response_text[:200]}")
+
+        # Fix YAML-style multiline strings (body: | ...)
+        def fix_yaml_strings(text):
+            pattern = r':\s*\|\s*\n((?:\s+.+\n?)+)'
+
+            def replace_match(m):
+                content = m.group(1)
+                lines = content.split('\n')
+                cleaned = []
+                for line in lines:
+                    stripped = line.strip()
+                    if stripped:
+                        cleaned.append(stripped)
+                return ': "' + '\\n'.join(cleaned) + '"'
+            return re.sub(pattern, replace_match, text)
+
+        response_text = fix_yaml_strings(response_text)
+
+        parsed_data = json.loads(response_text, strict=False)
+        suggested_title = parsed_data.get("title", current_title)
+        suggested_labels = parsed_data.get("labels", current_labels)
+        suggested_body = parsed_data.get("body", new_description)
+
+        print("\n🤖 Sugestões do agente:")
+        print(f"   📌 Título sugerido: {suggested_title}")
+        print(f"   🏷️  Labels sugeridas: {', '.join(suggested_labels) if suggested_labels else 'nenhuma'}")
+        print("   📄 Descrição sugerida:")
+        print(f"   {suggested_body[:200]}{'...' if len(suggested_body) > 200 else ''}")
+
+        last = {**last, "title": suggested_title, "labels": suggested_labels, "body": suggested_body}
+        return last
+
+    except Exception as e:
+        print(f"\n⚠️  Ollama indisponível: {e}")
+        print("   Edição manual.")
+        return _prompt_edit(last)
 
 
 def _handle_close_issue(last: Dict[str, Any], issue_data: Dict, issue_titles: Dict[int, str]) -> Dict[str, Any]:

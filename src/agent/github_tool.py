@@ -41,12 +41,14 @@ def check_repo_access(repo: str) -> bool:
         raise RuntimeError(f"Erro ao verificar repositório: {e}")
 
 
-def create_issue(repo: str, title: str, body: Optional[str] = None) -> Dict[str, Any]:
+def create_issue(repo: str, title: str, body: Optional[str] = None, labels: Optional[list] = None) -> Dict[str, Any]:
     """Cria uma issue no GitHub."""
     url = f"{GITHUB_API_BASE}/repos/{repo}/issues"
     payload = {"title": title}
     if body:
         payload["body"] = body
+    if labels:
+        payload["labels"] = labels
 
     response = requests.post(url, json=payload, headers=get_headers())
 
@@ -75,7 +77,11 @@ def get_issue(repo: str, issue_number: int) -> Dict[str, Any]:
         raise RuntimeError(f"Erro ao buscar issue: {response.status_code} - {response.text}")
 
 
-def edit_issue(repo: str, issue_number: int, title: Optional[str] = None, body: Optional[str] = None) -> Dict[str, Any]:
+def edit_issue(
+    repo: str, issue_number: int,
+    title: Optional[str] = None, body: Optional[str] = None,
+    labels: Optional[list] = None
+) -> Dict[str, Any]:
     """Edita uma issue existente no GitHub."""
     url = f"{GITHUB_API_BASE}/repos/{repo}/issues/{issue_number}"
     payload = {}
@@ -83,6 +89,8 @@ def edit_issue(repo: str, issue_number: int, title: Optional[str] = None, body: 
         payload["title"] = title
     if body:
         payload["body"] = body
+    if labels is not None:
+        payload["labels"] = labels
 
     if not payload:
         raise RuntimeError("Nenhum campo para atualizar foi fornecido.")
@@ -123,6 +131,7 @@ def execute_github_action(action_data: Dict[str, Any]) -> Dict[str, Any]:
     issue_number = action_data.get("issue_number")
     title = action_data.get("title")
     body = action_data.get("body")
+    labels = action_data.get("labels")
 
     if not repo:
         raise RuntimeError("Repositório não especificado (campo 'repo' obrigatório).")
@@ -130,12 +139,12 @@ def execute_github_action(action_data: Dict[str, Any]) -> Dict[str, Any]:
     if action == "create_issue":
         if not title:
             raise RuntimeError("Título da issue obrigatório para criação.")
-        return create_issue(repo, title, body)
+        return create_issue(repo, title, body, labels)
 
     elif action == "edit_issue":
         if not issue_number:
             raise RuntimeError("Número da issue obrigatório para edição.")
-        return edit_issue(repo, issue_number, title, body)
+        return edit_issue(repo, issue_number, title, body, labels)
 
     elif action == "close_issue":
         if not issue_number:

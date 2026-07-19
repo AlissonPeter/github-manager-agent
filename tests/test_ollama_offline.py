@@ -137,11 +137,12 @@ class TestEnhancerNodeOllamaOffline:
 
         with patch("src.agent.graph.ollama") as mock_ollama:
             mock_ollama.chat.return_value = {
-                "message": {"content": "## Descrição\nDescrição melhorada"}
+                "message": {"content": '{"title": "Título Sugerido", "body": "Descrição melhorada"}'}
             }
 
             result = enhancer_node(state)
-            assert result["last_action"]["body"] == "## Descrição\nDescrição melhorada"
+            assert result["last_action"]["title"] == "Teste"
+            assert result["last_action"]["body"] == "Descrição melhorada"
 
 
 class TestDefaultModel:
