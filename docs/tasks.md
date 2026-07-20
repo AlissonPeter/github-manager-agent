@@ -70,25 +70,25 @@ Implementação da ferramenta de notificação ativa (*Push*) utilizando a API d
 **Depende de:** T-001, T-003
 
 ## Critérios de Aceitação
-- [ ] Criar e configurar o bot no Telegram via `@BotFather` para obter o Token de acesso.
-- [ ] Capturar o `chat_id` do usuário para direcionamento correto dos alertas.
-- [ ] Implementar a função de notificação usando `requests.post` apontando para os endpoints oficiais do Telegram, carregando os dados do bot (`TELEGRAM_TOKEN` e `TELEGRAM_CHAT_ID`) a partir do arquivo `.env`.
-- [ ] Amarrar a ferramenta criada ao nó `notifier` na saída do grafo do LangGraph.
-- [ ] Testar o recebimento das mensagens Markdown no celular de forma integrada ao fluxo do terminal.
-- [ ] Criar testes unitários para validar a integração e disparo de notificações da API do Telegram.
+- [x] Criar e configurar o bot no Telegram via `@BotFather` para obter o Token de acesso.
+- [x] Capturar o `chat_id` do usuário para direcionamento correto dos alertas.
+- [x] Implementar a função de notificação usando `requests.post` apontando para os endpoints oficiais do Telegram, carregando os dados do bot (`TELEGRAM_TOKEN` e `TELEGRAM_CHAT_ID`) a partir do arquivo `.env`.
+- [x] Amarrar a ferramenta criada ao nó `notifier` na saída do grafo do LangGraph.
+- [x] Testar o recebimento das mensagens Markdown no celular de forma integrada ao fluxo do terminal.
+- [x] Criar testes unitários para validar a integração e disparo de notificações da API do Telegram.
 
 ---
 
 ## T-005: Documentação Final, Engenharia de Prompts e Slides
-## Descrição Elaboração e consolidação de todos os artefatos textuais, de segurança e de apresentação necessários para a submissão e avaliação final no AVA.
+## Descrição
+Elaboração e consolidação de todos os artefatos textuais, de segurança e de apresentação necessários.
 **Estimativa:** 3h
 **Depende de:** T-001, T-002, T-003, T-004
 
 ## Critérios de Aceitação
-- [ ] Escrever o arquivo `README.md` completo contendo: objetivo do agente, explicação do grafo, instruções detalhadas de execução (incluindo instruções para configurar as variáveis no arquivo `.env` a partir do `.env.example`), e exemplos reais de entrada e saída.
-- [ ] Criar o documento `docs/prompts.md` isolando e documentando o System Prompt e as estratégias de engenharia de prompt aplicadas no agente.
-- [ ] Desenvolver a apresentação de até 2 slides resumindo o problema, o agente construído, suas ferramentas e a visão geral do fluxo.
-- [ ] Testar a visibilidade pública do repositório do GitHub em uma janela anônima antes da submissão final no AVA.
+- [x] Escrever o arquivo `README.md` completo contendo: objetivo do agente, explicação do grafo, instruções detalhadas de execução (incluindo instruções para configurar as variáveis no arquivo `.env` a partir do `.env.example`), e exemplos reais de entrada e saída.
+- [x] Criar o documento `docs/prompts.md` isolando e documentando o System Prompt e as estratégias de engenharia de prompt aplicadas no agente.
+- [x] Desenvolver a apresentação de até 2 slides em formato `html` resumindo o problema, o agente construído, suas ferramentas e a visão geral do fluxo.
 
 ---
 
