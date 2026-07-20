@@ -604,12 +604,10 @@ def _handle_edit_issue(last: Dict[str, Any], issue_data: Dict) -> Dict[str, Any]
     current_body = last.get("body", "")
     current_labels = last.get("labels", [])
 
-    print(f"\n{'=' * 40}")
     print("\n✏️  Editar Issue")
     print(f"📌 Título atual: {current_title}")
     print(f"🏷️  Labels: {', '.join(current_labels) if current_labels else 'nenhuma'}")
     print(f"\n📄 Descrição atual:\n{current_body}")
-    print(f"{'=' * 40}")
 
     new_description = _input_multiline("Nova descrição resumida (Enter para manter a atual):", allow_empty=True)
     if not new_description or not new_description.strip():
@@ -685,11 +683,14 @@ REGRAS:
         suggested_labels = parsed_data.get("labels", current_labels)
         suggested_body = parsed_data.get("body", new_description)
 
+        print(f"\n{'=' * 40}")
         print("\n🤖 Sugestões do agente:")
-        print(f"   📌 Título sugerido: {suggested_title}")
-        print(f"   🏷️  Labels sugeridas: {', '.join(suggested_labels) if suggested_labels else 'nenhuma'}")
-        print("   📄 Descrição sugerida:")
-        print(f"   {suggested_body[:200]}{'...' if len(suggested_body) > 200 else ''}")
+        print("")
+        print(f"📌 Título: {suggested_title}")
+        print(f"🏷️ Labels: {', '.join(suggested_labels) if suggested_labels else 'nenhuma'}")
+        print("📄 Descrição:")
+        print(f"{suggested_body}")
+        print(f"{'=' * 40}")
 
         last = {**last, "title": suggested_title, "labels": suggested_labels, "body": suggested_body}
         return last
@@ -759,8 +760,9 @@ def confirmator_node(state: AgentState) -> Dict[str, Any]:
 
     last = _fetch_issue_data(last, issue_titles)
 
-    preview = _format_issue_preview(last)
-    print(f"\n{'=' * 40}\n{preview}\n{'=' * 40}")
+    if last.get("action") != "edit_issue":
+        preview = _format_issue_preview(last)
+        print(f"\n{'=' * 40}\n{preview}\n{'=' * 40}")
 
     if last.get("action") == "close_issue":
         resp = input(
