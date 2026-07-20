@@ -110,7 +110,7 @@ class TestEnhancerNodeOllamaOffline:
             assert result["last_action"]["body"] == "Descrição original"
 
     def test_enhancer_generates_default_body_when_empty(self):
-        """Deve gerar corpo padrão quando descrição está vazia."""
+        """Deve manter body vazio quando descrição está vazia (usuário deve informar)."""
         state = {
             "last_action": {
                 "action": "create_issue",
@@ -123,7 +123,8 @@ class TestEnhancerNodeOllamaOffline:
             mock_ollama.chat.side_effect = ConnectionError("Connection refused")
 
             result = enhancer_node(state)
-            assert result["last_action"]["body"] == "Criar issue sobre: Teste"
+            # Agora o body permanece vazio pois o usuário deve informar a descrição
+            assert result["last_action"]["body"] == ""
 
     def test_enhancer_enhances_description_when_ollama_available(self):
         """Deve melhorar descrição quando Ollama está disponível."""
