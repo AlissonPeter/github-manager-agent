@@ -32,6 +32,9 @@ def run_terminal_loop():
     app = build_graph()
 
     default_repo = _prompt_repo()
+    if default_repo is None:
+        print("Encerrando...")
+        return
     print(f"📦 Repositório selecionado: {default_repo}")
 
     print("\nComandos disponíveis:")
@@ -65,11 +68,7 @@ def run_terminal_loop():
 
             last_action = result.get("last_action", {})
             action = last_action.get("action")
-            if last_action.get("executed"):
-                print(f"✅ Ação executada com sucesso: {action}")
-                if "result" in last_action:
-                    print(f"   Resultado: {last_action['result']}")
-            elif action != "historico":
+            if not last_action.get("executed") and action != "historico":
                 print("⚠️  Ação não executada.")
 
             print()

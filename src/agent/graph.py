@@ -9,6 +9,7 @@ from langgraph.checkpoint.memory import MemorySaver
 import ollama
 
 from src.agent.github_tool import execute_github_action, get_issue, check_repo_access, list_open_issues
+from src.agent.telegram_tool import notify_github_action
 
 try:
     from dotenv import load_dotenv
@@ -135,7 +136,10 @@ def _input_multiline(prompt: str, allow_empty: bool = True, default: str = "") -
 def _prompt_repo() -> str:
     """Solicita ao usuário o repositório e valida o formato e existência."""
     while True:
-        repo = input("📦 Informe o repositório (owner/repo): ").strip()
+        repo = input("📦 Informe o repositório (owner/repo) ou 'sair': ").strip()
+        if repo.lower() in {"sair", "exit", "q"}:
+            print("❌ Operação cancelada.")
+            return None
         if not _validate_repo(repo):
             print("❌ Formato inválido. Use: owner/repo")
             continue
@@ -321,15 +325,15 @@ def enhancer_node(state: AgentState) -> Dict[str, Any]:
 
     if not last.get("title"):
         print("\n--- Criar Nova Issue ---")
-        body = _input_multiline("📄 Descrição (Enter duas vezes para pular):")
+        while True:
+            body = _input_multiline("📄 Descrição (obrigatório):", allow_empty=False)
+            if body.strip():
+                break
+            print("❌ Descrição é obrigatória. Por favor, informe a descrição da issue.")
         last = {**last, "body": body}
 
     title = last.get("title", "")
     body = last.get("body", "")
-
-    if not body:
-        body = f"Criar issue sobre: {title}"
-        last = {**last, "body": body}
 
     system_prompt = """Você é um assistente especializado em criar issues detalhadas para GitHub.
 
@@ -346,10 +350,6 @@ O campo "body" DEVE obrigatoriamente conter as seguintes seções em Markdown:
    - Mínimo de 3 critérios
    - Cada critério DEVE usar o formato checkbox: - [ ] Critério aqui
    - Inclua critérios funcionais, validações e casos de borda
-
-3. ## Critérios Técnicos (opcional, mas recomendado)
-   - Requisitos técnicos de implementação
-   - Dependências ou impactos
 
 Diretrizes IMPORTANTES:
 1. Mantenha a intenção original do usuário
@@ -391,6 +391,16 @@ Exemplo de formato esperado:
         json_end = response_text.rfind("}")
         if json_start != -1 and json_end != -1 and json_start <= json_end:
             response_text = response_text[json_start:json_end + 1]
+        elif json_start != -1:
+            # JSON pode estar truncado - tenta corrigir
+            response_text = response_text[json_start:]
+            # Fecha chaves e colchetes abertos
+            open_braces = response_text.count("{") - response_text.count("}")
+            open_brackets = response_text.count("[") - response_text.count("]")
+            # Remove vírgula final se houver
+            if response_text.rstrip().endswith(","):
+                response_text = response_text.rstrip()[:-1]
+            response_text += "]" * open_brackets + "}" * open_braces
         else:
             raise ValueError(f"Resposta não contém JSON: {response_text[:200]}")
 
@@ -412,8 +422,8 @@ Exemplo de formato esperado:
 
 def _calculate_similarity(str1: str, str2: str) -> float:
     """Calcula similaridade entre duas strings (0.0 a 1.0)."""
-    str1 = str1.lower().strip()
-    str2 = str2.lower().strip()
+    str1 = (str1 or "").lower().strip()
+    str2 = (str2 or "").lower().strip()
 
     if not str1 or not str2:
         return 0.0
@@ -453,10 +463,10 @@ def duplicate_checker(state: AgentState) -> Dict[str, Any]:
     if action not in ("create_issue", "edit_issue") or not repo:
         return {"last_action": last}
 
-    print(f"\n🔍 Verificando duplicatas no repositório {repo}...")
-
     try:
-        open_issues = list_open_issues(repo)
+        print(f"   🔍 Verificando duplicatas no repositório {repo}...")
+        with _Spinner("   Aguarde..."):
+            open_issues = list_open_issues(repo)
         print(f"   Encontradas {len(open_issues)} issues abertas")
     except Exception as e:
         print(f"\n⚠️  Não foi possível verificar issues existentes: {e}")
@@ -510,7 +520,7 @@ def duplicate_checker(state: AgentState) -> Dict[str, Any]:
             print("❌ Operação cancelada pelo usuário.")
             return {"user_confirmation": False, "last_action": last}
 
-    return {"last_action": last}
+    return {"last_action": last, "user_confirmation": True}
 
 
 def _format_issue_preview(action_data: Dict[str, Any]) -> str:
@@ -557,8 +567,13 @@ def _prompt_edit(action_data: Dict[str, Any]) -> Dict[str, Any]:
 
     print(f"\nDescrição atual:\n{current_body}")
     new_body = _input_multiline("Nova descrição (Enter para manter):", allow_empty=True, default=current_body)
-    if not new_body:
+    if not new_body or not new_body.strip():
         new_body = current_body
+    elif new_body.strip() != current_body.strip():
+        # Usuário digitou algo diferente - valida se não está vazio
+        if not new_body.strip():
+            print("❌ Descrição não pode ser vazia. Mantendo descrição atual.")
+            new_body = current_body
 
     print(f"\nLabels atuais: {', '.join(current_labels) if current_labels else 'nenhuma'}")
     new_labels_str = input("Novas labels (Enter para manter, ou separadas por vírgula): ").strip()
@@ -597,7 +612,7 @@ def _handle_edit_issue(last: Dict[str, Any], issue_data: Dict) -> Dict[str, Any]
     print(f"{'=' * 40}")
 
     new_description = _input_multiline("Nova descrição resumida (Enter para manter a atual):", allow_empty=True)
-    if not new_description:
+    if not new_description or not new_description.strip():
         return last
 
     system_prompt = """Analise a nova descrição e retorne APENAS um JSON válido.
@@ -629,7 +644,7 @@ REGRAS:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"Título atual: {current_title}\n\nNova descrição resumida: {new_description}"}
             ],
-            options={"temperature": 0.1, "num_predict": 1024},
+            options={"temperature": 0.3},
             spinner_message="Melhorando descrição"
         )
 
@@ -798,16 +813,32 @@ def executor_node(state: AgentState) -> Dict[str, Any]:
         last = {**last, "repo": default_repo}
 
     try:
-        result = execute_github_action(last)
+        with _Spinner("⏳ Processando"):
+            result = execute_github_action(last)
         updated_action = {**last, "executed": True, "result": result}
 
         issue_number = last.get("issue_number")
         if not issue_number and result.get("issue"):
             issue_number = result["issue"].get("number")
 
+        if issue_number:
+            updated_action["issue_number"] = issue_number
+
         title = last.get("title")
         if issue_number and title:
             issue_titles = {**issue_titles, issue_number: title}
+
+        action = last.get("action")
+        action_labels = {
+            "create_issue": "Issue criada",
+            "edit_issue": "Issue editada",
+            "close_issue": "Issue fechada",
+        }
+        action_label = action_labels.get(action, action)
+        print(f"\n✅ {action_label} com sucesso!")
+        if issue_number:
+            print(f"   📌 #{issue_number} - {title}")
+            print(f"   🔗 https://github.com/{last.get('repo')}/issues/{issue_number}")
 
         history_entry = {
             "action": last.get("action"),
@@ -826,9 +857,24 @@ def executor_node(state: AgentState) -> Dict[str, Any]:
             if not issue_number and result.get("issue"):
                 issue_number = result["issue"].get("number")
 
+            if issue_number:
+                updated_action["issue_number"] = issue_number
+
             title = last.get("title")
             if issue_number and title:
                 issue_titles = {**issue_titles, issue_number: title}
+
+            action = last.get("action")
+            action_labels = {
+                "create_issue": "Issue criada",
+                "edit_issue": "Issue editada",
+                "close_issue": "Issue fechada",
+            }
+            action_label = action_labels.get(action, action)
+            print(f"\n✅ {action_label} com sucesso!")
+            if issue_number:
+                print(f"   📌 #{issue_number} - {title}")
+                print(f"   🔗 https://github.com/{last.get('repo')}/issues/{issue_number}")
 
             history_entry = {
                 "action": last.get("action"),
@@ -871,6 +917,28 @@ def historico_node(state: AgentState) -> Dict[str, Any]:
     return {}
 
 
+def notifier_node(state: AgentState) -> Dict[str, Any]:
+    """Nó que envia notificação via Telegram sobre a ação executada."""
+    last = state.get("last_action", {})
+    executed = last.get("executed")
+
+    if not executed:
+        return {}
+    print("")
+    with _Spinner("📱 Enviando notificação via Telegram"):
+        try:
+            result = notify_github_action(last)
+            if result.get("notified"):
+                print("\n✅ Notificação enviada via Telegram!")
+                return {"last_action": {**last, "notified": True}}
+            else:
+                print("\n⚠️  Notificação não enviada")
+                return {"last_action": {**last, "notified": False}}
+        except Exception as e:
+            print(f"\n⚠️  Erro ao enviar notificação: {e}")
+            return {}
+
+
 def route_after_router(state: AgentState) -> str:
     """Decide se o fluxo vai para confirmação, enhancer, historico ou direto para execução."""
     action = state.get("last_action", {}).get("action")
@@ -905,6 +973,7 @@ def build_graph() -> Any:
     g.add_node("enhancer", enhancer_node)
     g.add_node("confirmator", confirmator_node)
     g.add_node("executor", executor_node)
+    g.add_node("notifier", notifier_node)
     g.add_node("historico", historico_node)
 
     g.add_edge(START, "router")
@@ -938,7 +1007,8 @@ def build_graph() -> Any:
     )
 
     g.add_edge("duplicate_checker", "executor")
-    g.add_edge("executor", END)
+    g.add_edge("executor", "notifier")
+    g.add_edge("notifier", END)
     g.add_edge("historico", END)
 
     memory = MemorySaver()
@@ -955,6 +1025,7 @@ __all__ = [
     "enhancer_node",
     "confirmator_node",
     "executor_node",
+    "notifier_node",
     "historico_node",
     "build_graph",
     "execute_github_action",
